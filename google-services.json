@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1037415120401",
+    "firebase_url": "https://gourmet-pastries-default-rtdb.firebaseio.com",
+    "project_id": "gourmet-pastries",
+    "storage_bucket": "gourmet-pastries.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1037415120401:android:1a07dc90df7e7adaffbbb0",
+        "android_client_info": {
+          "package_name": "com.starkey18.gourmetpastries"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBliQXrOj-RtP_VgvTzoIRhjzt1KIzxEiU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
