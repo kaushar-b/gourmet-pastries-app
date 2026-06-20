@@ -98,10 +98,50 @@ function AuthGate() {
   return <Slot />;
 }
 
+import { Component, ReactNode } from 'react';
+import { ref as dbRef, set as dbSet } from 'firebase/database';
+import { db } from '../lib/firebase';
+import { Text } from 'react-native';
+
+class RootErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, message: error?.message ?? String(error) };
+  }
+  componentDidCatch(error: any, info: any) {
+    try {
+      dbSet(dbRef(db, 'debug/rootCrash'), {
+        message: error?.message ?? String(error),
+        stack: error?.stack ? String(error.stack).slice(0, 1500) : 'no stack',
+        componentStack: info?.componentStack ? String(info.componentStack).slice(0, 1500) : 'no component stack',
+        timestamp: Date.now(),
+      }).catch(() => {});
+    } catch {}
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#FADAD9', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#C65C69', textAlign: 'center', marginBottom: 12 }}>
+            Something went wrong starting the app
+          </Text>
+          <Text style={{ fontSize: 12, color: '#1a1612', textAlign: 'center' }}>{this.state.message}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function RootLayout() {
   return (
-    <CartProvider>
-      <AuthGate />
-    </CartProvider>
+    <RootErrorBoundary>
+      <CartProvider>
+        <AuthGate />
+      </CartProvider>
+    </RootErrorBoundary>
   );
 }
