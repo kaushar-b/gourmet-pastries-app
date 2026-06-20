@@ -4,13 +4,13 @@ import { getDatabase } from 'firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!,
-  databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL!,
+  apiKey: 'AIzaSyDrNRm208szSvHzb7iXPBuZUqm5RutfnVg',
+  authDomain: 'gourmet-pastries.firebaseapp.com',
+  projectId: 'gourmet-pastries',
+  storageBucket: 'gourmet-pastries.firebasestorage.app',
+  messagingSenderId: '1037415120401',
+  appId: '1:1037415120401:web:ea5f744dbc800646ffbbb0',
+  databaseURL: 'https://gourmet-pastries-default-rtdb.firebaseio.com',
 };
 
 const app = initializeApp(firebaseConfig);
