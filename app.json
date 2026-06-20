@@ -39,6 +39,12 @@
           "color": "#CE6F79"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "299f214c-0cd2-4062-8f90-cd97f5e33d1a"
+      }
+    },
+    "owner": "starkey1.8"
   }
 }
