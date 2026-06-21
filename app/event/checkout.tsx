@@ -9,9 +9,6 @@ const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
 const VAT_RATE = 0.14;
 
-// ─────────────────────────────────────────────────────────────
-// CAKE BASE PRICES — vary by type and flavour.
-// Update these values to match your actual pricing.
 const CAKE_TYPE_PRICES: Record<string, number> = {
   round: 350, tall_round: 420, tall_flat: 400, square_flat: 380,
   tiered: 650, sheet: 320, heart: 390, number: 410,
@@ -21,18 +18,16 @@ const FLAVOUR_SURCHARGES: Record<string, number> = {
   Chocolate: 30, Vanilla: 0, Coffee: 20, Fruit: 40,
   Lemon: 20, Other: 50, 'None / Skip': 0,
 };
-// ─────────────────────────────────────────────────────────────
-
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export default function EventCheckout() {
   const router = useRouter();
-  const { addToCart } = useCart();
-  const params = useLocalSearchParams<{ eventData: string }>();
+  const { addToCart, updateCartItem } = useCart();
+  const params = useLocalSearchParams<{ eventData: string; editId?: string }>();
   const eventData = params.eventData ? JSON.parse(params.eventData) : null;
+  const editId = params.editId || null;
 
-  const [orderType, setOrderType] = useState<'pickup' | 'delivery' | null>(null);
-  const [tip, setTip]             = useState<number | null>(null);
+  const [orderType, setOrderType] = useState<'pickup' | 'delivery' | null>(eventData?.orderType ?? null);
+  const [tip, setTip]             = useState<number | null>(eventData?.tip ?? null);
   const [placing, setPlacing]     = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
@@ -47,7 +42,7 @@ export default function EventCheckout() {
     );
   }
 
-  const cakeName = `Custom ${eventData.occasion && eventData.occasion !== 'None / Skip' ? eventData.occasion + ' ' : ''}Cake`;
+  const cakeName = `Custom ${eventData.occasion && eventData.occasion !== 'Other' && eventData.occasion !== 'None / Skip' ? eventData.occasion + ' ' : ''}Cake`;
   const basePrice = CAKE_TYPE_PRICES[eventData.cakeType ?? 'none'] ?? 350;
   const flavourExtra = FLAVOUR_SURCHARGES[eventData.flavour ?? 'None / Skip'] ?? 0;
   const total = basePrice + flavourExtra;
@@ -58,40 +53,30 @@ export default function EventCheckout() {
   const depositDue = deposit + vatAmount + (tip ?? 0);
 
   const buildCartItem = () => ({
-    id: `event-${Date.now()}`,
+    id: editId || `event-${Date.now()}`,
     name: cakeName,
-    price: grandTotal,
+    price: total,
     icon: 'gift',
     cakeOrder: {
       ...eventData,
       orderType,
       tip: tip ?? 0,
-      total,
-      deposit,
-      remaining,
-      vatAmount,
-      grandTotal,
+      total, deposit, remaining, vatAmount, grandTotal,
     },
   });
 
   const handleAddToCart = () => {
     if (!orderType) { Alert.alert('Select an option', 'Please choose Pickup or Delivery.'); return; }
     const item = buildCartItem();
-    addToCart(item.id, item);
+    if (editId) updateCartItem(editId, item);
+    else addToCart(item.id, item);
     router.replace('/tabs/cart');
   };
 
   const handlePayNow = () => {
     if (!orderType) { Alert.alert('Select an option', 'Please choose Pickup or Delivery.'); return; }
     setPlacing(true);
-    // Stub: behaves like a real order placement for now.
-    // TODO: integrate Absa payment gateway here — replace this stub with
-    // the actual payment redirect/confirmation flow once Absa merchant
-    // ecommerce account + API credentials are set up.
-    setTimeout(() => {
-      setPlacing(false);
-      setOrderPlaced(true);
-    }, 800);
+    setTimeout(() => { setPlacing(false); setOrderPlaced(true); }, 800);
   };
 
   if (orderPlaced) {
@@ -119,11 +104,10 @@ export default function EventCheckout() {
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1a1612" />
         </TouchableOpacity>
-        <Text style={s.title}>Event Checkout</Text>
+        <Text style={s.title}>{editId ? 'Edit Cake' : 'Event Checkout'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 130 }}>
-
         <View style={s.depositNote}>
           <Ionicons name="information-circle" size={20} color={PINK_DARK} />
           <Text style={s.depositNoteText}>50% Down Payment required to confirm your order</Text>
@@ -145,8 +129,8 @@ export default function EventCheckout() {
           <>
             <Text style={s.sectionLabel}>Driver Tip</Text>
             <View style={s.tipRow}>
-              <TouchableOpacity style={[s.tipBtn, tip === null && s.tipBtnActive]} onPress={() => setTip(null)}>
-                <Ionicons name="remove-circle-outline" size={22} color={tip === null ? '#fff' : PINK_DARK} />
+              <TouchableOpacity style={[s.tipBtn, (tip === null || tip === 0) && s.tipBtnActive]} onPress={() => setTip(null)}>
+                <Ionicons name="remove-circle-outline" size={22} color={(tip === null || tip === 0) ? '#fff' : PINK_DARK} />
               </TouchableOpacity>
               {[5, 10, 20].map(amt => (
                 <TouchableOpacity key={amt} style={[s.tipBtn, tip === amt && s.tipBtnActive]} onPress={() => setTip(amt)}>
@@ -169,17 +153,18 @@ export default function EventCheckout() {
           <View style={s.summaryDivider} />
           <View style={s.summaryRow}><Text style={s.summaryTotal}>Due Now</Text><Text style={s.summaryTotalAmt}>P {depositDue}.00</Text></View>
         </View>
-
       </ScrollView>
 
       <View style={s.footer}>
-        <TouchableOpacity style={[s.payBtn, placing && { opacity: 0.6 }]} onPress={handlePayNow} disabled={placing}>
-          <Ionicons name="card" size={20} color="#fff" />
-          <Text style={s.payBtnText}>{placing ? 'Processing...' : `Pay Now — P ${depositDue}.00`}</Text>
-        </TouchableOpacity>
+        {!editId && (
+          <TouchableOpacity style={[s.payBtn, placing && { opacity: 0.6 }]} onPress={handlePayNow} disabled={placing}>
+            <Ionicons name="card" size={20} color="#fff" />
+            <Text style={s.payBtnText}>{placing ? 'Processing...' : `Pay Now — P ${depositDue}.00`}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={s.addCartBtn} onPress={handleAddToCart}>
           <Ionicons name="cart" size={20} color={PINK_DARK} />
-          <Text style={s.addCartBtnText}>Add to Cart</Text>
+          <Text style={s.addCartBtnText}>{editId ? 'Update Cart' : 'Add to Cart'}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -15,7 +15,7 @@ const VAT_RATE   = 0.14;
 
 export default function Checkout() {
   const router = useRouter();
-  const { items, total, clearCart } = useCart();
+  const { items, clearCart } = useCart();
 
   const [name, setName]               = useState('');
   const [phone, setPhone]             = useState('');
@@ -28,8 +28,15 @@ export default function Checkout() {
   const [placing, setPlacing]         = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
-  const vatAmount  = Math.round(total * VAT_RATE);
-  const grandTotal = total + vatAmount + tip;
+  const menuFull      = items.filter(i => !i.cakeOrder).reduce((sm, i) => sm + i.price * i.quantity, 0);
+  const cakeFull      = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.total ?? 0), 0);
+  const cakeDeposit   = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.deposit ?? 0), 0);
+  const cakeRemaining = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.remaining ?? 0), 0);
+  const cakeTips      = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.tip ?? 0), 0);
+  const subtotal   = menuFull + cakeFull;
+  const vatAmount  = Math.round(subtotal * VAT_RATE);
+  const total      = subtotal; // keep name used elsewhere
+  const grandTotal = menuFull + cakeDeposit + vatAmount + tip + cakeTips;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -52,16 +59,18 @@ export default function Checkout() {
 
       const orderData = {
         name: name.trim(),
-        phone: phone.trim(),
+        phone: '+267' + phone.trim(),
         orderType,
         address: address1.trim(),
         address2: address2.trim(),
         paymentMethod,
         tip,
-        items: items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
-        subtotal: total,
+        items: items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, cakeOrder: i.cakeOrder ?? null })),
+        subtotal,
         total: grandTotal,
         vatAmount,
+        cakeRemaining,
+        amountPaid: grandTotal,
         status: 'pending',
         assignedToDriver: false,
         driverStatus: null,
@@ -193,7 +202,10 @@ export default function Checkout() {
           {errors.name ? <Text style={s.errTxt}>{errors.name}</Text> : null}
           <TextInput style={s.input} placeholder="Full name" placeholderTextColor="#b58a8d" value={name} onChangeText={setName} />
           {errors.phone ? <Text style={s.errTxt}>{errors.phone}</Text> : null}
-          <TextInput style={s.input} placeholder="Phone number (8 digits)" placeholderTextColor="#b58a8d" value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={8} />
+          <View style={s.phoneRow}>
+            <View style={s.phonePrefix}><Text style={s.phoneFlag}>🇧🇼</Text><Text style={s.phonePrefixText}>+267</Text></View>
+            <TextInput style={s.phoneInput} placeholder="71234567" placeholderTextColor="#b58a8d" value={phone} onChangeText={t => setPhone(t.replace(/[^0-9]/g, '').slice(0, 8))} keyboardType="number-pad" maxLength={8} />
+          </View>
 
           {/* Order summary */}
           <Text style={s.sectionLabel}>Order Summary</Text>
@@ -243,6 +255,11 @@ const s = StyleSheet.create({
   tipBtnText:      { fontSize: 14, fontWeight: '800', color: '#1a1612' },
   tipBtnTextActive:{ color: '#fff' },
   input:           { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding: 14, fontSize: 15, color: '#1a1612', marginBottom: 10 },
+  phoneRow:        { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  phonePrefix:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 12 },
+  phoneFlag:       { fontSize: 18 },
+  phonePrefixText: { fontSize: 15, fontWeight: '800', color: '#1a1612' },
+  phoneInput:      { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding: 14, fontSize: 15, color: '#1a1612' },
   summaryBox:      { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: PINK_MID, elevation: 1 },
   summaryRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryItem:     { fontSize: 13, color: '#6b6b6b', flex: 1, paddingRight: 8 },

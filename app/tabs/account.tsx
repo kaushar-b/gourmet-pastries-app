@@ -41,7 +41,6 @@ export default function Account() {
           </View>
           <View style={s.profileInfo}>
             <Text style={s.profileEmail}>{user?.email ?? '—'}</Text>
-            <Text style={s.profileSub}>Customer Account</Text>
           </View>
         </View>
 

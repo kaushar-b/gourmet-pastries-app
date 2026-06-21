@@ -27,6 +27,8 @@ type CartContextType = {
   items: CartItem[];
   addToCart: (id: string, item?: AddableItem) => void;
   removeFromCart: (id: string) => void;
+  removeLine: (id: string) => void;
+  updateCartItem: (id: string, item: AddableItem) => void;
   clearCart: () => void;
   total: number;
   count: number;
@@ -87,12 +89,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     showToast('Removed from Cart');
   };
 
+  const removeLine = (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+    showToast('Removed from Cart');
+  };
+
+  const updateCartItem = (id: string, item: AddableItem) => {
+    setItems(prev => prev.map(i => i.id === id
+      ? { id, name: item.name, price: item.price, icon: item.icon || i.icon, image: item.image, quantity: i.quantity, cakeOrder: item.cakeOrder }
+      : i));
+    showToast('Cart Updated');
+  };
+
   const clearCart = () => setItems([]);
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, clearCart, total, count }}>
+    <CartContext.Provider value={{ items, addToCart, removeFromCart, removeLine, updateCartItem, clearCart, total, count }}>
       <View style={{ flex: 1 }}>
         {children}
         <CartToast message={toastMsg} opacity={toastOpacity} />

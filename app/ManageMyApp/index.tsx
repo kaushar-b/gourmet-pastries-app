@@ -6,7 +6,7 @@ import { auth } from '../../lib/firebase';
 
 const MANAGER_EMAIL = 'gourmetpastries.bw@gmail.com';
 // Keep this in sync with app/_layout.tsx DRIVER_EMAIL
-const DRIVER_EMAIL  = 'REPLACE_WITH_DRIVER_EMAIL@example.com';
+const DRIVER_EMAIL  = 'web.expert.remote@gmail.com';
 
 export default function ManageMyAppIndex() {
   const router = useRouter();

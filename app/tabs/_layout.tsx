@@ -4,7 +4,9 @@ import { useCart } from '../../context/CartContext';
 import { View, Text, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import { ref, set } from 'firebase/database';
+import { auth, db } from '../../lib/firebase';
+import { registerForPushToken } from '../../lib/notifications';
 
 const PINK_DARK = '#CE6F79';
 
@@ -37,6 +39,17 @@ function AccountIcon({ size }: { size: number }) {
 }
 
 export default function TabsLayout() {
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      try {
+        const token = await registerForPushToken();
+        if (token) await set(ref(db, `userTokens/${user.uid}`), token);
+      } catch {}
+    });
+    return unsub;
+  }, []);
+
   return (
     <Tabs
       screenOptions={{

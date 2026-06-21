@@ -10,28 +10,117 @@ const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
 
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const TYPE_LABELS: Record<string, string> = {
+  round: 'Round', tall_round: 'Tall Round', tall_flat: 'Tall Flat', square_flat: 'Square Flat',
+  tiered: 'Tiered', sheet: 'Sheet Cake', heart: 'Heart Shaped', number: 'Number/Alphabet',
+  cupcake_tower: 'Cupcake Tower', sculpted: 'Sculpted',
+};
+function fmtDate(d: any) { return d ? `${d.day} ${MONTH_NAMES[d.month]} ${d.year}` : '—'; }
+function fmtHour(h: any) {
+  if (!h) return '—';
+  const hr = h.h % 12 === 0 ? 12 : h.h % 12;
+  return `${String(hr).padStart(2,'0')}:${String(h.m).padStart(2,'0')} ${h.h >= 12 ? 'PM' : 'AM'}`;
+}
+
 type Order = {
-  id: string;
-  date: string;
-  orderType: 'pickup' | 'delivery';
-  status: string;
-  driverStatus?: string | null;
-  items: { name: string; price: number; quantity: number }[];
-  total: number;
-  deposit?: number;
-  remaining?: number;
-  paid?: boolean;
-  cakeOrder?: Record<string, any>;
+  id: string; date: string; orderType: 'pickup' | 'delivery';
+  status: string; driverStatus?: string | null;
+  items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
+  total: number; cakeRemaining?: number; paid?: boolean;
+  createdAt?: number;
 };
 
-function statusLabel(order: Order): { label: string; color: string; icon: string } {
-  if (order.paid) return { label: 'Paid ✓', color: '#22c55e', icon: 'checkmark-circle' };
-  if (order.driverStatus === 'delivered') return { label: 'Delivered', color: '#22c55e', icon: 'checkmark-circle' };
-  if (order.driverStatus === 'on_the_way') return { label: 'On the Way', color: '#3b82f6', icon: 'car' };
-  if (order.driverStatus === 'picked_up') return { label: 'With Driver', color: '#8b5cf6', icon: 'bicycle' };
-  if (order.status === 'completed') return { label: 'Ready for Pickup', color: '#f59e0b', icon: 'storefront' };
-  if (order.status === 'preparing') return { label: 'Being Prepared', color: '#f97316', icon: 'restaurant' };
-  return { label: 'Order Received', color: PINK_DARK, icon: 'receipt' };
+function statusLabel(o: Order): { label: string; color: string; icon: string } {
+  if (o.status === 'completed' || o.driverStatus === 'delivered') return { label: 'Completed', color: '#22c55e', icon: 'checkmark-circle' };
+  if (o.driverStatus === 'on_the_way') return { label: 'On the Way', color: '#3b82f6', icon: 'car' };
+  if (o.driverStatus === 'picked_up') return { label: 'With Driver', color: '#8b5cf6', icon: 'bicycle' };
+  if (o.assignedToDriver) return { label: 'Assigned to Driver', color: '#8b5cf6', icon: 'bicycle' } as any;
+  if (o.status === 'ready') return { label: 'Ready for Pickup', color: '#f59e0b', icon: 'storefront' };
+  if (o.status === 'preparing') return { label: 'Preparing', color: '#f97316', icon: 'restaurant' };
+  return { label: 'Received', color: PINK_DARK, icon: 'receipt' };
+}
+
+function CakeBlock({ cake }: { cake: any }) {
+  const Row = ({ l, v }: { l: string; v: string }) => (
+    <View style={s.sumRow}><Text style={s.sumLabel}>{l}</Text><Text style={s.sumValue}>{v}</Text></View>
+  );
+  return (
+    <View style={s.cakeBox}>
+      <Text style={s.cakeBoxTitle}>Custom Cake</Text>
+      <Row l="Occasion" v={cake.occasion === 'Other' ? cake.occasionOther : (cake.occasion || '—')} />
+      <Row l="Cake Parts" v={String(cake.cakeParts ?? '—')} />
+      <Row l="Flavour" v={cake.flavour === 'Other' ? cake.flavourOther : (cake.flavour || '—')} />
+      <Row l="Type" v={cake.cakeType === 'number' ? cake.cakeTypeOther : (TYPE_LABELS[cake.cakeType] || '—')} />
+      <Row l="Allergies" v={cake.allergies?.length ? cake.allergies.join(', ') + (cake.allergyOther ? ` (${cake.allergyOther})` : '') : 'None'} />
+      <Row l="Date" v={fmtDate(cake.date)} />
+      <Row l="Time" v={fmtHour(cake.hour)} />
+      {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}
+      <Row l="Full Price" v={`P ${cake.total}.00`} />
+      <Row l="Deposit Paid" v={`P ${cake.deposit}.00`} />
+    </View>
+  );
+}
+
+function OrderRow({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+  const { label, color, icon } = statusLabel(order);
+  const remaining = order.cakeRemaining ?? 0;
+
+  return (
+    <View style={s.card}>
+      <View style={s.cardTop}>
+        <View style={s.cardTopLeft}>
+          <Text style={s.cardDate}>{order.date}</Text>
+          <Text style={s.cardType}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
+        </View>
+        <View style={[s.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
+          <Ionicons name={icon as any} size={13} color={color} />
+          <Text style={[s.statusText, { color }]}>{label}</Text>
+        </View>
+      </View>
+
+      <View style={s.divider} />
+
+      {order.items?.map((item, i) => (
+        <View key={i}>
+          <View style={s.itemRow}>
+            <Text style={s.itemName}>{item.quantity}× {item.name}</Text>
+            <Text style={s.itemPrice}>P {item.price * item.quantity}.00</Text>
+          </View>
+        </View>
+      ))}
+
+      {order.items?.some(i => i.cakeOrder) && (
+        <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
+          <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} cake details</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
+        </TouchableOpacity>
+      )}
+      {open && order.items?.filter(i => i.cakeOrder).map((i, idx) => <CakeBlock key={idx} cake={i.cakeOrder} />)}
+
+      <View style={s.divider} />
+
+      <View style={s.totalRow}>
+        <Text style={s.totalLabel}>Paid Now</Text>
+        <Text style={s.totalVal}>P {order.total}.00</Text>
+      </View>
+
+      {remaining > 0 && (
+        order.paid ? (
+          <View style={[s.balancePill, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
+            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Text style={[s.balanceText, { color: '#22c55e' }]}>Paid</Text>
+          </View>
+        ) : (
+          <View style={[s.balancePill, { backgroundColor: '#C65C6922', borderColor: '#C65C69' }]}>
+            <Ionicons name="alert-circle" size={16} color="#C65C69" />
+            <Text style={[s.balanceText, { color: '#C65C69' }]}>Remaining Balance: P {remaining}.00</Text>
+          </View>
+        )
+      )}
+    </View>
+  );
 }
 
 export default function Orders() {
@@ -47,14 +136,11 @@ export default function Orders() {
 
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
-    const q = ref(db, 'orders');
-    const unsub = onValue(q, snap => {
+    const unsub = onValue(ref(db, 'orders'), snap => {
       const all: Order[] = [];
       snap.forEach(child => {
         const v = child.val();
-        if (v.userId === uid) {
-          all.push({ id: child.key!, ...v });
-        }
+        if (v.userId === uid) all.push({ id: child.key!, ...v });
       });
       all.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
       setOrders(all);
@@ -64,16 +150,12 @@ export default function Orders() {
   }, [uid]);
 
   if (loading) return (
-    <View style={s.center}>
-      <ActivityIndicator size="large" color={PINK_DARK} />
-    </View>
+    <View style={s.center}><ActivityIndicator size="large" color={PINK_DARK} /></View>
   );
 
   return (
     <View style={s.container}>
-      <View style={s.header}>
-        <Text style={s.title}>My Orders</Text>
-      </View>
+      <View style={s.header}><Text style={s.title}>My Orders</Text></View>
 
       {orders.length === 0 ? (
         <View style={s.empty}>
@@ -85,61 +167,7 @@ export default function Orders() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-          {orders.map(order => {
-            const { label, color, icon } = statusLabel(order);
-            return (
-              <View key={order.id} style={s.card}>
-                <View style={s.cardTop}>
-                  <View style={s.cardTopLeft}>
-                    <Text style={s.cardDate}>{order.date}</Text>
-                    <Text style={s.cardType}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
-                  </View>
-                  <View style={[s.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
-                    <Ionicons name={icon as any} size={13} color={color} />
-                    <Text style={[s.statusText, { color }]}>{label}</Text>
-                  </View>
-                </View>
-
-                <View style={s.divider} />
-
-                {order.items?.map((item, i) => (
-                  <View key={i} style={s.itemRow}>
-                    <Text style={s.itemName}>{item.quantity}× {item.name}</Text>
-                    <Text style={s.itemPrice}>P {item.price * item.quantity}.00</Text>
-                  </View>
-                ))}
-
-                {order.cakeOrder && (
-                  <View style={s.cakeTag}>
-                    <Ionicons name="gift-outline" size={13} color={PINK_DARK} />
-                    <Text style={s.cakeTagText}>Custom Cake Order</Text>
-                  </View>
-                )}
-
-                <View style={s.divider} />
-
-                <View style={s.totalRow}>
-                  <Text style={s.totalLabel}>Total</Text>
-                  <Text style={s.totalVal}>P {order.total}.00</Text>
-                </View>
-
-                {order.deposit != null && (
-                  <>
-                    <View style={s.totalRow}>
-                      <Text style={s.totalLabel}>50% Deposit</Text>
-                      <Text style={s.totalVal}>P {order.deposit}.00</Text>
-                    </View>
-                    <View style={s.totalRow}>
-                      <Text style={s.toBePaidLabel}>To be Paid</Text>
-                      <Text style={[s.toBePaidVal, order.paid && s.paidVal]}>
-                        {order.paid ? '✓ Paid' : `P ${order.remaining ?? 0}.00`}
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            );
-          })}
+          {orders.map(order => <OrderRow key={order.id} order={order} />)}
         </ScrollView>
       )}
     </View>
@@ -156,7 +184,7 @@ const s = StyleSheet.create({
   shopBtn:      { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 },
   shopBtnText:  { fontSize: 15, fontWeight: '700', color: '#fff' },
   card:         { backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 16, elevation: 2 },
-  cardTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 },
+  cardTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   cardTopLeft:  { gap: 2 },
   cardDate:     { fontSize: 13, fontWeight: '700', color: '#1a1612' },
   cardType:     { fontSize: 12, color: '#6b6b6b' },
@@ -166,12 +194,16 @@ const s = StyleSheet.create({
   itemRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   itemName:     { fontSize: 13, color: '#1a1612', flex: 1 },
   itemPrice:    { fontSize: 13, fontWeight: '600', color: '#1a1612' },
-  cakeTag:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  cakeTagText:  { fontSize: 12, color: PINK_DARK, fontWeight: '700' },
+  dropToggle:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, paddingVertical: 6 },
+  dropToggleText:{ fontSize: 13, fontWeight: '700', color: PINK_DARK },
+  cakeBox:      { backgroundColor: PINK_LIGHT, borderRadius: 10, padding: 12, marginTop: 6 },
+  cakeBoxTitle: { fontSize: 12, fontWeight: '800', color: PINK_DARK, marginBottom: 6 },
+  sumRow:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  sumLabel:     { fontSize: 12, color: '#6b6b6b', fontWeight: '600' },
+  sumValue:     { fontSize: 12, color: '#1a1612', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 12 },
   totalRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   totalLabel:   { fontSize: 13, color: '#6b6b6b' },
   totalVal:     { fontSize: 13, fontWeight: '700', color: '#1a1612' },
-  toBePaidLabel:{ fontSize: 14, fontWeight: '800', color: '#1a1612' },
-  toBePaidVal:  { fontSize: 14, fontWeight: '800', color: PINK_DARK },
-  paidVal:      { color: '#22c55e' },
+  balancePill:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
+  balanceText:  { fontSize: 14, fontWeight: '800' },
 });

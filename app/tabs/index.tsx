@@ -12,8 +12,6 @@ const PINK_DEEPER = '#D78289';
 
 const ITEM_SIZE = Math.round(SW / 3);
 
-// ── PLACEHOLDER CAROUSEL DATA ──
-// Swap these out later: replace the icon-tile with <Image source={require('../../assets/images/...')} />
 const CAROUSEL_ITEMS = [
   { id: 'c1', label: 'Celebration Cakes', icon: 'gift-outline' as const },
   { id: 'c2', label: 'Cupcakes', icon: 'flower-outline' as const },
@@ -40,6 +38,12 @@ function PlaceholderTile({ icon, size }: { icon: keyof typeof Ionicons.glyphMap;
 const ph = StyleSheet.create({
   tile: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: PINK_MID },
 });
+
+const ACTIONS = [
+  { label: 'Menu',  icon: 'restaurant' as const,         route: '/menu/menu' as const },
+  { label: 'Event', icon: 'calendar' as const,           route: '/event/event' as const },
+  { label: 'About', icon: 'information-circle' as const,  route: '/about' as const },
+];
 
 export default function Home() {
   const router = useRouter();
@@ -91,15 +95,12 @@ export default function Home() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 0 }}>
 
-        {/* Title + Logo */}
-        <Text style={styles.brandTitle}>Gourmet Fine Pastries</Text>
+        {/* Logo */}
         <View style={styles.logoWrap}>
-          <PlaceholderTile icon="rose-outline" size={SW * 0.55} />
+          <Image source={require('../../assets/pink-icon.png')} style={styles.logo} resizeMode="contain" />
         </View>
 
-        <View style={{ height: 12 }} />
-
-        {/* Carousel — 3 visible, auto-sliding */}
+        {/* Carousel — 3 visible, auto-sliding, flush left + right */}
         <View style={styles.carouselWrap}>
           <FlatList
             ref={flatRef}
@@ -118,18 +119,17 @@ export default function Home() {
           />
         </View>
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: 22 }} />
 
-        {/* Quick Actions */}
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/menu/menu')}>
-            <Ionicons name="restaurant" size={20} color="#fff" />
-            <Text style={styles.actionLabel}>Menu</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/event/event')}>
-            <Ionicons name="calendar" size={20} color="#fff" />
-            <Text style={styles.actionLabel}>Event</Text>
-          </TouchableOpacity>
+        {/* Stacked action buttons */}
+        <View style={styles.actionsCol}>
+          {ACTIONS.map(a => (
+            <TouchableOpacity key={a.label} style={styles.actionBtn} onPress={() => router.push(a.route)} activeOpacity={0.85}>
+              <Ionicons name={a.icon} size={28} color="#fff" />
+              <Text style={styles.actionLabel}>{a.label}</Text>
+              <Ionicons name="chevron-forward" size={26} color={PINK_LIGHT} />
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Big single-image slideshow */}
@@ -162,17 +162,17 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  header:          { flexDirection: 'row', alignItems: 'center', backgroundColor: PINK_LIGHT, paddingTop: 44, paddingBottom: 2, paddingHorizontal: 16 },
+  header:          { flexDirection: 'row', alignItems: 'center', backgroundColor: PINK_LIGHT, paddingTop: 44, paddingBottom: 0, paddingHorizontal: 16 },
   cartCircle:      { width: 42, height: 42, borderRadius: 21, backgroundColor: PINK_DARK, alignItems: 'center', justifyContent: 'center' },
   cartBadge:       { position: 'absolute', top: -4, right: -4, backgroundColor: '#fff', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   cartBadgeText:   { color: PINK_DARK, fontSize: 10, fontWeight: '800' },
-  brandTitle:      { fontSize: 24, fontWeight: '900', color: '#1a1612', textAlign: 'center', marginTop: 8, marginBottom: 14 },
-  logoWrap:        { alignItems: 'center', justifyContent: 'center' },
-  carouselWrap:    { marginTop: 2, paddingLeft: 16 },
+  logoWrap:        { alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  logo:            { width: SW * 0.72, height: SW * 0.72 },
+  carouselWrap:    { marginTop: 6 },
   carouselItem:    { marginRight: 8, borderRadius: 12, overflow: 'hidden' },
-  actionsRow:      { flexDirection: 'row', gap: 14, marginHorizontal: 16, marginBottom: 20 },
-  actionBtn:       { flex: 1, backgroundColor: PINK_DARK, borderRadius: 50, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, elevation: 2 },
-  actionLabel:     { fontSize: 17, fontWeight: '800', color: '#fff' },
+  actionsCol:      { marginHorizontal: 16, marginBottom: 20, gap: 14 },
+  actionBtn:       { backgroundColor: PINK_DARK, borderRadius: 18, paddingVertical: 22, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', elevation: 2 },
+  actionLabel:     { fontSize: 20, fontWeight: '800', color: '#fff', marginLeft: 16, flex: 1 },
   sectionWrap:     { marginBottom: 20, paddingHorizontal: 16 },
   slideshowWrap:   { borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 2 },
   slideshowLabel:  { fontSize: 14, fontWeight: '700', color: '#1a1612', padding: 12, textAlign: 'center' },

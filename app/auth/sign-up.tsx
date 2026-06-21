@@ -42,7 +42,7 @@ export default function SignUp() {
 
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Image source={require('../../assets/icon.png')} style={s.logo} resizeMode="contain" />
+      <Image source={require('../../assets/pink-icon.png')} style={s.logo} resizeMode="contain" />
       <View style={s.card}>
         <Text style={s.title}>Create account</Text>
         <Text style={s.subtitle}>Sign up to start ordering</Text>

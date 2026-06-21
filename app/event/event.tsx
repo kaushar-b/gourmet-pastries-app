@@ -9,7 +9,7 @@ const PINK_LIGHT  = '#FADAD9';
 const PINK_MID    = '#E9ABAE';
 const PINK_DEEPER = '#D78289';
 
-const ITEM_SIZE = Math.round(SW / 3);
+const EVENT_ITEM = Math.round(SW / 2.3);
 
 const CAROUSEL_ITEMS = [
   { id: 'c1', icon: 'gift-outline' as const },
@@ -20,25 +20,24 @@ const CAROUSEL_ITEMS = [
   { id: 'c6', icon: 'pie-chart-outline' as const },
 ];
 
-const OCCASIONS = ['Birthday', 'Party', 'Wedding', 'Corporate', 'None / Skip'];
+const OCCASIONS = ['Birthday', 'Party', 'Wedding', 'Corporate', 'Other'];
 const FLAVOURS = ['Chocolate', 'Vanilla', 'Coffee', 'Fruit', 'Lemon', 'Other', 'None / Skip'];
 const PART_COUNTS = Array.from({ length: 25 }, (_, i) => 4 + i * 4); // 4..100 step 4
 
 const CAKE_TYPES = [
-  { id: 'round',      label: 'Round',          icon: 'ellipse-outline' as const },
-  { id: 'tall_round',  label: 'Tall Round',     icon: 'ellipse-outline' as const },
-  { id: 'tall_flat',   label: 'Tall Flat',      icon: 'square-outline' as const },
-  { id: 'square_flat', label: 'Square Flat',    icon: 'square-outline' as const },
-  { id: 'tiered',      label: 'Tiered',         icon: 'layers-outline' as const },
-  { id: 'sheet',       label: 'Sheet Cake',     icon: 'tablet-landscape-outline' as const },
-  { id: 'heart',       label: 'Heart Shaped',   icon: 'heart-outline' as const },
-  { id: 'number',      label: 'Number Shaped',  icon: 'text-outline' as const },
-  { id: 'cupcake_tower', label: 'Cupcake Tower', icon: 'gift-outline' as const },
-  { id: 'sculpted',    label: 'Sculpted',       icon: 'shapes-outline' as const },
-  { id: 'none',        label: 'None / Skip',    icon: 'close-circle-outline' as const },
+  { id: 'round',         label: 'Round',           icon: 'ellipse-outline' as const },
+  { id: 'tall_round',    label: 'Tall Round',      icon: 'ellipse-outline' as const },
+  { id: 'tall_flat',     label: 'Tall Flat',       icon: 'square-outline' as const },
+  { id: 'square_flat',   label: 'Square Flat',     icon: 'square-outline' as const },
+  { id: 'tiered',        label: 'Tiered',          icon: 'layers-outline' as const },
+  { id: 'sheet',         label: 'Sheet Cake',      icon: 'tablet-landscape-outline' as const },
+  { id: 'heart',         label: 'Heart Shaped',    icon: 'heart-outline' as const },
+  { id: 'number',        label: 'Number/Alphabet', icon: 'text-outline' as const },
+  { id: 'cupcake_tower', label: 'Cupcake Tower',   icon: 'gift-outline' as const },
+  { id: 'sculpted',      label: 'Sculpted',        icon: 'shapes-outline' as const },
 ];
 
-const ALLERGY_OPTIONS = ['Gluten', 'Almond', 'Peanuts', 'Dairy', 'Eggs', 'Soy', 'Other'];
+const ALLERGY_OPTIONS = ['Gluten', 'Almond', 'Peanuts', 'Dairy', 'Eggs', 'Soy', 'Other', 'None'];
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -62,10 +61,12 @@ const ph = StyleSheet.create({
 
 export type EventOrderData = {
   occasion: string | null;
+  occasionOther: string;
   cakeParts: number | null;
   flavour: string | null;
   flavourOther: string;
   cakeType: string | null;
+  cakeTypeOther: string;
   allergies: string[];
   allergyOther: string;
   date: { year: number; month: number; day: number } | null;
@@ -82,10 +83,12 @@ export default function EventBuilder() {
 
   const [data, setData] = useState<EventOrderData>({
     occasion: null,
+    occasionOther: '',
     cakeParts: null,
     flavour: null,
     flavourOther: '',
     cakeType: null,
+    cakeTypeOther: '',
     allergies: [],
     allergyOther: '',
     date: null,
@@ -96,6 +99,8 @@ export default function EventBuilder() {
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [hourVal, setHourVal] = useState(12);
   const [minuteVal, setMinuteVal] = useState(0);
+  const [hourPicked, setHourPicked] = useState(false);
+  const [minutePicked, setMinutePicked] = useState(false);
 
   const flatRef = useRef<FlatList>(null);
   const LOOPED = [...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS];
@@ -116,13 +121,13 @@ export default function EventBuilder() {
   }, [step]);
 
   const canGoNext = (): boolean => {
-    if (step === 'occasion') return !!data.occasion;
+    if (step === 'occasion') return !!data.occasion && (data.occasion !== 'Other' || data.occasionOther.trim().length > 0);
     if (step === 'parts') return !!data.cakeParts;
     if (step === 'flavour') return !!data.flavour && (data.flavour !== 'Other' || data.flavourOther.trim().length > 0);
-    if (step === 'type') return !!data.cakeType;
-    if (step === 'allergies') return true; // multi-select, can be empty
+    if (step === 'type') return !!data.cakeType && (data.cakeType !== 'number' || data.cakeTypeOther.trim().length > 0);
+    if (step === 'allergies') return data.allergies.length > 0;
     if (step === 'date') return !!data.date;
-    if (step === 'hour') return !!data.hour;
+    if (step === 'hour') return hourPicked && minutePicked;
     return true;
   };
 
@@ -130,6 +135,18 @@ export default function EventBuilder() {
   const goBack = () => {
     if (stepIdx === 0) { router.push('/tabs'); return; }
     setStepIdx(i => i - 1);
+  };
+
+  const toggleAllergy = (opt: string) => {
+    setData(d => {
+      const checked = d.allergies.includes(opt);
+      if (opt === 'None') {
+        return { ...d, allergies: checked ? [] : ['None'], allergyOther: checked ? d.allergyOther : '' };
+      }
+      const base = d.allergies.filter(a => a !== 'None');
+      const has = base.includes(opt);
+      return { ...d, allergies: has ? base.filter(a => a !== opt) : [...base, opt] };
+    });
   };
 
   return (
@@ -156,16 +173,21 @@ export default function EventBuilder() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={(item, i) => `${item.id}-${i}`}
-                getItemLayout={(_, i) => ({ length: ITEM_SIZE + 8, offset: (ITEM_SIZE + 8) * i, index: i })}
+                getItemLayout={(_, i) => ({ length: EVENT_ITEM + 8, offset: (EVENT_ITEM + 8) * i, index: i })}
                 onScrollToIndexFailed={() => {}}
                 renderItem={({ item }) => (
                   <View style={s.carouselItem}>
-                    <PlaceholderTile icon={item.icon} size={ITEM_SIZE} />
+                    <PlaceholderTile icon={item.icon} size={EVENT_ITEM} />
                   </View>
                 )}
               />
             </View>
-            <Text style={s.introText}>Let's build your perfect celebration cake — step by step.</Text>
+            <Text style={s.introHeading}>Custom Event Cake</Text>
+            <Text style={s.introText}>Let's build your perfect event cake, step by step.</Text>
+            <TouchableOpacity style={s.introStartBtn} onPress={goNext} activeOpacity={0.85}>
+              <Text style={s.introStartText}>Let's Start</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
           </>
         )}
 
@@ -173,16 +195,31 @@ export default function EventBuilder() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>What's the occasion?</Text>
             {OCCASIONS.map(opt => (
-              <TouchableOpacity
-                key={opt}
-                style={[s.optionRow, data.occasion === opt && s.optionRowActive]}
-                onPress={() => setData(d => ({ ...d, occasion: opt }))}
-              >
-                <View style={[s.radio, data.occasion === opt && s.radioActive]}>
-                  {data.occasion === opt && <View style={s.radioDot} />}
-                </View>
-                <Text style={[s.optionText, data.occasion === opt && s.optionTextActive]}>{opt}</Text>
-              </TouchableOpacity>
+              <View key={opt}>
+                <TouchableOpacity
+                  style={[s.optionRow, data.occasion === opt && s.optionRowActive]}
+                  onPress={() => setData(d => ({ ...d, occasion: opt }))}
+                >
+                  <View style={[s.radio, data.occasion === opt && s.radioActive]}>
+                    {data.occasion === opt && <View style={s.radioDot} />}
+                  </View>
+                  <Text style={[s.optionText, data.occasion === opt && s.optionTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+                {opt === 'Other' && data.occasion === 'Other' && (
+                  <View style={s.specifyRow}>
+                    <TextInput
+                      style={s.specifyInput}
+                      placeholder="Specify occasion..."
+                      placeholderTextColor="#aaa"
+                      value={data.occasionOther}
+                      onChangeText={v => setData(d => ({ ...d, occasionOther: v }))}
+                    />
+                    <TouchableOpacity style={s.okBtn}>
+                      <Text style={s.okBtnText}>OK</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             ))}
           </View>
         )}
@@ -190,20 +227,20 @@ export default function EventBuilder() {
         {step === 'parts' && (
           <View style={s.section}>
             <Text style={s.sectionTitle}>Number of Cake Parts</Text>
-            <View style={s.partsRow}>
-              <PlaceholderTile icon="layers-outline" size={70} />
-              <ScrollView style={s.partsScroller} contentContainerStyle={{ paddingVertical: 8 }}>
-                {PART_COUNTS.map(n => (
-                  <TouchableOpacity
-                    key={n}
-                    style={[s.partOption, data.cakeParts === n && s.partOptionActive]}
-                    onPress={() => setData(d => ({ ...d, cakeParts: n }))}
-                  >
-                    <Text style={[s.partOptionText, data.cakeParts === n && s.partOptionTextActive]}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+            <View style={s.partsTopImage}>
+              <PlaceholderTile icon="layers-outline" size={100} />
             </View>
+            <ScrollView style={s.partsScrollerFull} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
+              {PART_COUNTS.map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={[s.partOption, data.cakeParts === n && s.partOptionActive]}
+                  onPress={() => setData(d => ({ ...d, cakeParts: n }))}
+                >
+                  <Text style={[s.partOptionText, data.cakeParts === n && s.partOptionTextActive]}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -250,7 +287,7 @@ export default function EventBuilder() {
                   style={[s.typeCard, data.cakeType === t.id && s.typeCardActive]}
                   onPress={() => setData(d => ({ ...d, cakeType: t.id }))}
                 >
-                  <Ionicons name={t.icon} size={28} color={data.cakeType === t.id ? '#fff' : PINK_DARK} />
+                  <Ionicons name={t.icon} size={34} color={data.cakeType === t.id ? '#fff' : PINK_DARK} />
                   <Text style={[s.typeLabel, data.cakeType === t.id && s.typeLabelActive]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -275,6 +312,20 @@ export default function EventBuilder() {
                 <Ionicons name="chevron-forward" size={20} color={typePage === 1 ? '#ccc' : PINK_DARK} />
               </TouchableOpacity>
             </View>
+            {data.cakeType === 'number' && (
+              <View style={s.specifyRow}>
+                <TextInput
+                  style={s.specifyInput}
+                  placeholder="Specify number/letters..."
+                  placeholderTextColor="#aaa"
+                  value={data.cakeTypeOther}
+                  onChangeText={v => setData(d => ({ ...d, cakeTypeOther: v }))}
+                />
+                <TouchableOpacity style={s.okBtn}>
+                  <Text style={s.okBtnText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
@@ -287,10 +338,7 @@ export default function EventBuilder() {
                 <View key={opt}>
                   <TouchableOpacity
                     style={[s.optionRow, checked && s.optionRowActive]}
-                    onPress={() => setData(d => ({
-                      ...d,
-                      allergies: checked ? d.allergies.filter(a => a !== opt) : [...d.allergies, opt],
-                    }))}
+                    onPress={() => toggleAllergy(opt)}
                   >
                     <View style={[s.checkbox, checked && s.checkboxActive]}>
                       {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
@@ -346,10 +394,12 @@ export default function EventBuilder() {
                   return (
                     <TouchableOpacity
                       key={day}
-                      style={[s.calCell, s.calDayCell, isSelected && s.calDayCellActive]}
+                      style={s.calCell}
                       onPress={() => setData(d => ({ ...d, date: { year: calYear, month: calMonth, day } }))}
                     >
-                      <Text style={[s.calDayText, isSelected && s.calDayTextActive]}>{day}</Text>
+                      <View style={[s.calDayPill, isSelected && s.calDayPillActive]}>
+                        <Text style={[s.calDayText, isSelected && s.calDayTextActive]}>{day}</Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -363,26 +413,26 @@ export default function EventBuilder() {
             <Text style={s.sectionTitle}>Hour</Text>
             <View style={s.hourRow}>
               <View style={s.hourBox}>
-                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }}>
+                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
                   {Array.from({ length: 24 }, (_, i) => i).map(h => (
                     <TouchableOpacity
                       key={h}
-                      style={[s.hourOption, hourVal === h && s.hourOptionActive]}
-                      onPress={() => { setHourVal(h); setData(d => ({ ...d, hour: { h, m: minuteVal } })); }}
+                      style={[s.hourOption, hourPicked && hourVal === h && s.hourOptionActive]}
+                      onPress={() => { setHourVal(h); setHourPicked(true); setData(d => ({ ...d, hour: { h, m: minuteVal } })); }}
                     >
-                      <Text style={[s.hourOptionText, hourVal === h && s.hourOptionTextActive]}>{String(h).padStart(2, '0')}</Text>
+                      <Text style={[s.hourOptionText, hourPicked && hourVal === h && s.hourOptionTextActive]}>{String(h).padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <Text style={s.hourColon}>:</Text>
-                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }}>
+                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
                   {Array.from({ length: 60 }, (_, i) => i).filter(m => m % 5 === 0).map(m => (
                     <TouchableOpacity
                       key={m}
-                      style={[s.hourOption, minuteVal === m && s.hourOptionActive]}
-                      onPress={() => { setMinuteVal(m); setData(d => ({ ...d, hour: { h: hourVal, m } })); }}
+                      style={[s.hourOption, minutePicked && minuteVal === m && s.hourOptionActive]}
+                      onPress={() => { setMinuteVal(m); setMinutePicked(true); setData(d => ({ ...d, hour: { h: hourVal, m } })); }}
                     >
-                      <Text style={[s.hourOptionText, minuteVal === m && s.hourOptionTextActive]}>{String(m).padStart(2, '0')}</Text>
+                      <Text style={[s.hourOptionText, minutePicked && minuteVal === m && s.hourOptionTextActive]}>{String(m).padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -398,10 +448,10 @@ export default function EventBuilder() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>Order Summary</Text>
             <View style={s.recallBox}>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Occasion</Text><Text style={s.recallValue}>{data.occasion || '—'}</Text></View>
+              <View style={s.recallRow}><Text style={s.recallLabel}>Occasion</Text><Text style={s.recallValue}>{data.occasion === 'Other' ? data.occasionOther : (data.occasion || '—')}</Text></View>
               <View style={s.recallRow}><Text style={s.recallLabel}>Cake Parts</Text><Text style={s.recallValue}>{data.cakeParts || '—'}</Text></View>
               <View style={s.recallRow}><Text style={s.recallLabel}>Flavour</Text><Text style={s.recallValue}>{data.flavour === 'Other' ? data.flavourOther : (data.flavour || '—')}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Type</Text><Text style={s.recallValue}>{CAKE_TYPES.find(t => t.id === data.cakeType)?.label || '—'}</Text></View>
+              <View style={s.recallRow}><Text style={s.recallLabel}>Type</Text><Text style={s.recallValue}>{data.cakeType === 'number' ? data.cakeTypeOther : (CAKE_TYPES.find(t => t.id === data.cakeType)?.label || '—')}</Text></View>
               <View style={s.recallRow}><Text style={s.recallLabel}>Allergies</Text><Text style={s.recallValue}>{data.allergies.length ? data.allergies.join(', ') + (data.allergyOther ? ` (${data.allergyOther})` : '') : 'None'}</Text></View>
               <View style={s.recallRow}><Text style={s.recallLabel}>Date</Text><Text style={s.recallValue}>{data.date ? `${data.date.day} ${MONTH_NAMES[data.date.month]} ${data.date.year}` : '—'}</Text></View>
               <View style={s.recallRow}><Text style={s.recallLabel}>Time</Text><Text style={s.recallValue}>{data.hour ? `${String(data.hour.h % 12 === 0 ? 12 : data.hour.h % 12).padStart(2,'0')}:${String(data.hour.m).padStart(2,'0')} ${data.hour.h >= 12 ? 'PM' : 'AM'}` : '—'}</Text></View>
@@ -425,16 +475,18 @@ export default function EventBuilder() {
 
       </ScrollView>
 
-      <View style={s.footer}>
-        <TouchableOpacity
-          style={[s.nextBtn, !canGoNext() && s.nextBtnDisabled]}
-          onPress={goNext}
-          disabled={!canGoNext()}
-        >
-          <Text style={s.nextBtnText}>{step === 'intro' ? "Let's Start" : 'Next'}</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {step !== 'intro' && step !== 'recall' && (
+        <View style={s.footer}>
+          <TouchableOpacity
+            style={[s.nextBtn, !canGoNext() && s.nextBtnDisabled]}
+            onPress={goNext}
+            disabled={!canGoNext()}
+          >
+            <Text style={s.nextBtnText}>Next</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -445,11 +497,14 @@ const s = StyleSheet.create({
   backBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6, width: 70 },
   backText:         { fontSize: 16, fontWeight: '700', color: '#1a1612' },
   headerCenter:     { flex: 1, alignItems: 'center' },
-  title:            { fontSize: 16, fontWeight: '800', color: '#1a1612', textAlign: 'center' },
+  title:            { fontSize: 16, fontWeight: '800', color: PINK_DARK, textAlign: 'center' },
   content:          { padding: 20, paddingBottom: 40 },
-  carouselWrap:     { marginBottom: 16, marginHorizontal: -20 },
-  carouselItem:     { width: ITEM_SIZE, height: ITEM_SIZE, marginRight: 8, marginLeft: 12, borderRadius: 12, overflow: 'hidden' },
-  introText:        { fontSize: 15, color: '#1a1612', textAlign: 'center', lineHeight: 22, marginTop: 8 },
+  carouselWrap:     { marginBottom: 20, marginHorizontal: -20 },
+  carouselItem:     { width: EVENT_ITEM, height: EVENT_ITEM, marginRight: 8, marginLeft: 12, borderRadius: 16, overflow: 'hidden' },
+  introHeading:     { fontSize: 30, fontWeight: '800', fontFamily: 'serif', fontStyle: 'italic', color: PINK_DARK, textAlign: 'center', marginTop: 8 },
+  introText:        { fontSize: 15, color: '#1a1612', textAlign: 'center', lineHeight: 22, marginTop: 10 },
+  introStartBtn:    { backgroundColor: PINK_DARK, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, alignSelf: 'center', marginTop: 36 },
+  introStartText:   { fontSize: 18, fontWeight: '800', color: '#fff' },
   section:          { marginTop: 8 },
   sectionTitle:     { fontSize: 19, fontWeight: '800', color: '#1a1612', marginBottom: 16 },
   optionRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1.5, borderColor: PINK_MID },
@@ -459,12 +514,12 @@ const s = StyleSheet.create({
   radioDot:         { width: 12, height: 12, borderRadius: 6, backgroundColor: PINK_DARK },
   optionText:       { fontSize: 15, fontWeight: '600', color: '#1a1612' },
   optionTextActive: { color: PINK_DARK, fontWeight: '800' },
-  specifyRow:       { flexDirection: 'row', gap: 10, marginBottom: 10, marginTop: -4, paddingHorizontal: 4 },
+  specifyRow:       { flexDirection: 'row', gap: 10, marginBottom: 10, marginTop: 4, paddingHorizontal: 4 },
   specifyInput:     { flex: 1, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: PINK_MID, padding: 12, fontSize: 14, color: '#1a1612' },
   okBtn:            { backgroundColor: PINK_DARK, borderRadius: 10, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
   okBtnText:        { color: '#fff', fontWeight: '800', fontSize: 14 },
-  partsRow:         { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-  partsScroller:    { flex: 1, maxHeight: 280, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID },
+  partsTopImage:    { alignItems: 'center', marginBottom: 16 },
+  partsScrollerFull:{ maxHeight: 280, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID },
   partOption:       { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: PINK_LIGHT },
   partOptionActive: { backgroundColor: PINK_DARK },
   partOptionText:   { fontSize: 16, fontWeight: '700', color: '#1a1612', textAlign: 'center' },
@@ -475,9 +530,8 @@ const s = StyleSheet.create({
   nextBtnDisabled:  { opacity: 0.4 },
   nextBtnText:      { fontSize: 16, fontWeight: '700', color: '#fff' },
 
-  // Type of Cake
   typeGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  typeCard:         { width: '30%', aspectRatio: 1, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: PINK_MID },
+  typeCard:         { width: '30%', aspectRatio: 1, backgroundColor: '#fff', borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: PINK_MID },
   typeCardActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   typeLabel:        { fontSize: 11, fontWeight: '700', color: '#1a1612', textAlign: 'center', paddingHorizontal: 4 },
   typeLabelActive:  { color: '#fff' },
@@ -488,22 +542,19 @@ const s = StyleSheet.create({
   dot:              { width: 8, height: 8, borderRadius: 4, backgroundColor: PINK_MID },
   dotActive:        { backgroundColor: PINK_DARK, width: 20 },
 
-  // Allergies
   checkbox:         { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: PINK_MID, alignItems: 'center', justifyContent: 'center' },
   checkboxActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
 
-  // Date / Calendar
   calCard:          { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: PINK_MID },
   calHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   calMonthLabel:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   calGrid:          { flexDirection: 'row', flexWrap: 'wrap' },
   calCell:          { width: `${100/7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  calDayCell:       { borderRadius: 999 },
-  calDayCellActive: { backgroundColor: PINK_DARK },
+  calDayPill:       { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  calDayPillActive: { backgroundColor: PINK_DARK },
   calDayText:       { fontSize: 14, fontWeight: '600', color: '#1a1612' },
   calDayTextActive: { color: '#fff', fontWeight: '800' },
 
-  // Hour
   hourRow:          { flexDirection: 'row', alignItems: 'center', gap: 16 },
   hourBox:          { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 8 },
   hourScroller:     { flex: 1, maxHeight: 200 },
@@ -515,13 +566,12 @@ const s = StyleSheet.create({
   ampmBadge:        { backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16 },
   ampmText:         { fontSize: 16, fontWeight: '900', color: '#fff' },
 
-  // Order Recall
   recallBox:        { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1.5, borderColor: PINK_MID, marginBottom: 20 },
   recallRow:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   recallLabel:      { fontSize: 13, color: '#6b6b6b', fontWeight: '600' },
   recallValue:      { fontSize: 13, color: '#1a1612', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 12 },
   confirmBtn:       { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 },
   confirmBtnText:   { fontSize: 16, fontWeight: '800', color: '#fff' },
-  editBtn:          { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: PINK_MID },
-  editBtnText:      { fontSize: 14, fontWeight: '700', color: '#6b6b6b' },
+  editBtn:          { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 2.5, borderColor: PINK_DARK, backgroundColor: '#fff' },
+  editBtnText:      { fontSize: 14, fontWeight: '800', color: PINK_DARK },
 });
