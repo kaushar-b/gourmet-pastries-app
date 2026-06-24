@@ -27,14 +27,14 @@ export default function About() {
         </View>
 
         <Text style={s.title}>Gourmet Fine Pastries</Text>
-        <Text style={s.tagline}>Handcrafted cakes & pastries, made with love</Text>
+        <Text style={s.tagline}>Handcrafted Cakes & Pastries</Text>
 
         <View style={s.card}>
           <Text style={s.body}>
             Welcome to Gourmet Fine Pastries. We specialise in custom celebration
-            cakes, fresh daily pastries, and bespoke bakes for every occasion —
-            birthdays, weddings, parties and corporate events. Every order is made
-            to order with the finest ingredients.
+            cakes, fresh daily pastries, and bakes for every occasion!
+            birthdays, weddings, parties and corporate events. Every order is made 
+            with the finest ingredients.
           </Text>
         </View>
 
@@ -43,7 +43,7 @@ export default function About() {
             <Ionicons name="location" size={20} color={PINK_DARK} />
             <Text style={s.rowTitle}>Location</Text>
           </View>
-          <Text style={s.rowText}>Set your shop address here</Text>
+          <Text style={s.rowText}>Mowana Park Mall, Phakalane</Text>
 
           <View style={s.divider} />
 
@@ -51,16 +51,22 @@ export default function About() {
             <Ionicons name="time" size={20} color={PINK_DARK} />
             <Text style={s.rowTitle}>Hours</Text>
           </View>
-          <Text style={s.rowText}>Mon–Sat: 8:00 AM – 6:00 PM{'\n'}Sunday: Closed</Text>
+          <Text style={s.rowText}>Mon–Sun: 7:00 AM – 10:00 PM</Text>
 
           <View style={s.divider} />
 
           <View style={s.row}>
-            <Ionicons name="call" size={20} color={PINK_DARK} />
+            <Ionicons name="mail" size={20} color={PINK_DARK} />
             <Text style={s.rowTitle}>Contact</Text>
           </View>
-          <Text style={s.rowText}>+267 0000 0000</Text>
+          <Text style={s.rowText}>gourmetpastries.bw@gmail.com</Text>
         </View>
+
+        <TouchableOpacity style={s.policyBtn} onPress={() => router.push('/policy')}>
+          <Ionicons name="document-text-outline" size={20} color={PINK_DARK} />
+          <Text style={s.policyBtnText}>Policies</Text>
+          <Ionicons name="chevron-forward" size={20} color={PINK_DARK} />
+        </TouchableOpacity>
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -84,5 +90,7 @@ const s = StyleSheet.create({
   row:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   rowTitle:    { fontSize: 15, fontWeight: '800', color: '#1a1612' },
   rowText:     { fontSize: 14, color: '#6b6b6b', marginLeft: 28, lineHeight: 21 },
+  policyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, padding: 18, borderWidth: 1, borderColor: PINK_MID, marginTop: 4 },
+  policyBtnText: { flex: 1, fontSize: 16, fontWeight: '800', color: '#1a1612' },
   divider:     { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 14 },
 });

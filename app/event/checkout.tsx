@@ -3,35 +3,25 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCart } from '../../context/CartContext';
+import { computeCakeTotal, VAT_RATE, CakeData } from '../../constants/eventPricing';
 
 const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
-const VAT_RATE = 0.14;
-
-const CAKE_TYPE_PRICES: Record<string, number> = {
-  round: 350, tall_round: 420, tall_flat: 400, square_flat: 380,
-  tiered: 650, sheet: 320, heart: 390, number: 410,
-  cupcake_tower: 500, sculpted: 700, none: 350,
-};
-const FLAVOUR_SURCHARGES: Record<string, number> = {
-  Chocolate: 30, Vanilla: 0, Coffee: 20, Fruit: 40,
-  Lemon: 20, Other: 50, 'None / Skip': 0,
-};
 
 export default function EventCheckout() {
   const router = useRouter();
   const { addToCart, updateCartItem } = useCart();
-  const params = useLocalSearchParams<{ eventData: string; editId?: string }>();
-  const eventData = params.eventData ? JSON.parse(params.eventData) : null;
+  const params = useLocalSearchParams<{ cakeData: string; editId?: string }>();
+  const data: CakeData | null = params.cakeData ? JSON.parse(params.cakeData) : null;
   const editId = params.editId || null;
 
-  const [orderType, setOrderType] = useState<'pickup' | 'delivery' | null>(eventData?.orderType ?? null);
-  const [tip, setTip]             = useState<number | null>(eventData?.tip ?? null);
-  const [placing, setPlacing]     = useState(false);
+  const [orderType, setOrderType] = useState<'pickup' | 'delivery' | null>(null);
+  const [tip, setTip] = useState<number | null>(null);
+  const [placing, setPlacing] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
-  if (!eventData) {
+  if (!data) {
     return (
       <View style={s.confirmContainer}>
         <Text style={s.confirmSub}>No order data found. Please start again from the Event page.</Text>
@@ -42,34 +32,26 @@ export default function EventCheckout() {
     );
   }
 
-  const cakeName = `Custom ${eventData.occasion && eventData.occasion !== 'Other' && eventData.occasion !== 'None / Skip' ? eventData.occasion + ' ' : ''}Cake`;
-  const basePrice = CAKE_TYPE_PRICES[eventData.cakeType ?? 'none'] ?? 350;
-  const flavourExtra = FLAVOUR_SURCHARGES[eventData.flavour ?? 'None / Skip'] ?? 0;
-  const total = basePrice + flavourExtra;
-  const deposit = Math.round(total * 0.5);
+  const cakeName  = `Custom ${data.occasion && data.occasion !== 'Other' ? data.occasion + ' ' : ''}Cake`;
+  const total     = computeCakeTotal(data);          // full cake, excl VAT
+  const deposit   = Math.round(total * 0.5);          // 50% principal
   const remaining = total - deposit;
-  const vatAmount = Math.round(total * VAT_RATE);
-  const grandTotal = total + vatAmount + (tip ?? 0);
-  const depositDue = deposit + vatAmount + (tip ?? 0);
+  const vatAmount = Math.round(total * VAT_RATE);      // FULL vat, charged now
+  const tipVal    = tip ?? 0;
+  const dueNow    = deposit + vatAmount + tipVal;      // pay now
 
-  const buildCartItem = () => ({
+  const buildItem = () => ({
     id: editId || `event-${Date.now()}`,
     name: cakeName,
     price: total,
     icon: 'gift',
-    cakeOrder: {
-      ...eventData,
-      orderType,
-      tip: tip ?? 0,
-      total, deposit, remaining, vatAmount, grandTotal,
-    },
+    cakeOrder: { ...data, orderType, tip: tipVal, total, deposit, remaining, vatAmount, dueNow },
   });
 
   const handleAddToCart = () => {
     if (!orderType) { Alert.alert('Select an option', 'Please choose Pickup or Delivery.'); return; }
-    const item = buildCartItem();
-    if (editId) updateCartItem(editId, item);
-    else addToCart(item.id, item);
+    const item = buildItem();
+    if (editId) updateCartItem(editId, item); else addToCart(item.id, item);
     router.replace('/tabs/cart');
   };
 
@@ -104,7 +86,7 @@ export default function EventCheckout() {
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1a1612" />
         </TouchableOpacity>
-        <Text style={s.title}>{editId ? 'Edit Cake' : 'Event Checkout'}</Text>
+        <Text style={s.title}>{editId ? 'Edit Cake' : 'Checkout'}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 130 }}>
@@ -141,17 +123,16 @@ export default function EventCheckout() {
           </>
         )}
 
-        <Text style={s.sectionLabel}>Order Summary</Text>
+        <Text style={s.sectionLabel}>Payment Summary</Text>
         <View style={s.summaryBox}>
           <View style={s.summaryRow}><Text style={s.summaryItem}>{cakeName}</Text><Text style={s.summaryPrice}>P {total}.00</Text></View>
           <View style={s.summaryDivider} />
           <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {total}.00</Text></View>
-          <View style={s.summaryRow}><Text style={s.summaryItem}>50% Deposit</Text><Text style={s.summaryPrice}>P {deposit}.00</Text></View>
-          <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining</Text><Text style={s.summaryPrice}>P {remaining}.00</Text></View>
-          <View style={s.summaryRow}><Text style={s.summaryItem}>VAT (14%)</Text><Text style={s.summaryPrice}>P {vatAmount}.00</Text></View>
-          {tip ? <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tip}.00</Text></View> : null}
+          <View style={s.summaryRow}><Text style={s.summaryItem}>Total Including VAT</Text><Text style={s.summaryPrice}>P {total + vatAmount}.00</Text></View>
+          <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining (on collection)</Text><Text style={s.summaryPrice}>P {remaining}.00</Text></View>
+          {tipVal ? <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tipVal}.00</Text></View> : null}
           <View style={s.summaryDivider} />
-          <View style={s.summaryRow}><Text style={s.summaryTotal}>Due Now</Text><Text style={s.summaryTotalAmt}>P {depositDue}.00</Text></View>
+          <View style={s.summaryRow}><Text style={s.summaryTotal}>50% + Full VAT</Text><Text style={s.summaryTotalAmt}>P {dueNow}.00</Text></View>
         </View>
       </ScrollView>
 
@@ -159,7 +140,7 @@ export default function EventCheckout() {
         {!editId && (
           <TouchableOpacity style={[s.payBtn, placing && { opacity: 0.6 }]} onPress={handlePayNow} disabled={placing}>
             <Ionicons name="card" size={20} color="#fff" />
-            <Text style={s.payBtnText}>{placing ? 'Processing...' : `Pay Now — P ${depositDue}.00`}</Text>
+            <Text style={s.payBtnText}>{placing ? 'Processing...' : `Pay Now — P ${dueNow}.00`}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={s.addCartBtn} onPress={handleAddToCart}>

@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useCart } from '../../context/CartContext';
+import { CAROUSEL_IMAGES } from '../../constants/carousel';
 
 const { width: SW } = Dimensions.get('window');
 const PINK_DARK   = '#CE6F79';
+const PINK_ACCENT = '#FF7FA1';
 const PINK_LIGHT  = '#FADAD9';
 const PINK_MID    = '#E9ABAE';
 const PINK_DEEPER = '#D78289';
@@ -52,8 +54,8 @@ export default function Home() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [slideIdx, setSlideIdx] = useState(0);
 
-  const LOOPED = [...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS];
-  const START = CAROUSEL_ITEMS.length;
+  const LOOPED = [...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES];
+  const START = CAROUSEL_IMAGES.length;
 
   useEffect(() => {
     try { flatRef.current?.scrollToIndex({ index: START, animated: false }); } catch {}
@@ -63,7 +65,7 @@ export default function Home() {
     const t = setInterval(() => {
       setCurrentIdx(prev => {
         const next = prev + 1;
-        try { flatRef.current?.scrollToIndex({ index: START + (next % CAROUSEL_ITEMS.length), animated: true }); } catch {}
+        try { flatRef.current?.scrollToIndex({ index: START + (next % CAROUSEL_IMAGES.length), animated: true }); } catch {}
         return next;
       });
     }, 2000);
@@ -108,12 +110,12 @@ export default function Home() {
             horizontal
             pagingEnabled={false}
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, i) => `${item.id}-${i}`}
+            keyExtractor={(_, i) => `c-${i}`}
             getItemLayout={(_, i) => ({ length: ITEM_SIZE + 8, offset: (ITEM_SIZE + 8) * i, index: i })}
             onScrollToIndexFailed={() => {}}
             renderItem={({ item }) => (
-              <View style={styles.carouselItem}>
-                <PlaceholderTile icon={item.icon} size={ITEM_SIZE} />
+              <View style={[styles.carouselItem, { width: ITEM_SIZE, height: ITEM_SIZE }]}>
+                <Image source={item} style={{ width: ITEM_SIZE, height: ITEM_SIZE }} resizeMode="cover" />
               </View>
             )}
           />
@@ -163,15 +165,15 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   header:          { flexDirection: 'row', alignItems: 'center', backgroundColor: PINK_LIGHT, paddingTop: 44, paddingBottom: 0, paddingHorizontal: 16 },
-  cartCircle:      { width: 42, height: 42, borderRadius: 21, backgroundColor: PINK_DARK, alignItems: 'center', justifyContent: 'center' },
+  cartCircle:      { width: 42, height: 42, borderRadius: 21, backgroundColor: PINK_ACCENT, alignItems: 'center', justifyContent: 'center' },
   cartBadge:       { position: 'absolute', top: -4, right: -4, backgroundColor: '#fff', borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
   cartBadgeText:   { color: PINK_DARK, fontSize: 10, fontWeight: '800' },
   logoWrap:        { alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  logo:            { width: SW * 0.72, height: SW * 0.72 },
+  logo:            { width: SW, height: SW },
   carouselWrap:    { marginTop: 6 },
   carouselItem:    { marginRight: 8, borderRadius: 12, overflow: 'hidden' },
   actionsCol:      { marginHorizontal: 16, marginBottom: 20, gap: 14 },
-  actionBtn:       { backgroundColor: PINK_DARK, borderRadius: 18, paddingVertical: 22, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', elevation: 2 },
+  actionBtn:       { backgroundColor: PINK_ACCENT, borderRadius: 40, paddingVertical: 22, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', elevation: 2 },
   actionLabel:     { fontSize: 20, fontWeight: '800', color: '#fff', marginLeft: 16, flex: 1 },
   sectionWrap:     { marginBottom: 20, paddingHorizontal: 16 },
   slideshowWrap:   { borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 2 },

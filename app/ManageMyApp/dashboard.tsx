@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ref, onValue, update, set, remove, get } from 'firebase/database';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../../lib/firebase';
+import { allergyDisplay, CAKE_TYPE_LABELS } from '../../constants/eventPricing';
 import { registerForPushToken, sendPushNotification, CHANNELS } from '../../lib/notifications';
 
 const PINK_DARK  = '#CE6F79';
@@ -12,11 +13,6 @@ const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const TYPE_LABELS: Record<string, string> = {
-  round: 'Round', tall_round: 'Tall Round', tall_flat: 'Tall Flat', square_flat: 'Square Flat',
-  tiered: 'Tiered', sheet: 'Sheet Cake', heart: 'Heart Shaped', number: 'Number/Alphabet',
-  cupcake_tower: 'Cupcake Tower', sculpted: 'Sculpted',
-};
 function fmtDate(d: any) { return d ? `${d.day} ${MONTH_NAMES[d.month]} ${d.year}` : '—'; }
 function fmtHour(h: any) {
   if (!h) return '—';
@@ -44,9 +40,11 @@ function CakeBlock({ cake }: { cake: any }) {
       <Text style={c.cakeBoxTitle}>Custom Cake</Text>
       <Row l="Occasion" v={cake.occasion === 'Other' ? cake.occasionOther : (cake.occasion || '—')} />
       <Row l="Cake Parts" v={String(cake.cakeParts ?? '—')} />
-      <Row l="Flavour" v={cake.flavour === 'Other' ? cake.flavourOther : (cake.flavour || '—')} />
-      <Row l="Type" v={cake.cakeType === 'number' ? cake.cakeTypeOther : (TYPE_LABELS[cake.cakeType] || '—')} />
-      <Row l="Allergies" v={cake.allergies?.length ? cake.allergies.join(', ') + (cake.allergyOther ? ` (${cake.allergyOther})` : '') : 'None'} />
+      <Row l="Flavour" v={(cake.flavours || []).join(', ') || '—'} />
+      <Row l="Decoration" v={(cake.decorations || []).join(', ') || '—'} />
+      <Row l="Text" v={cake.cakeText?.trim() || 'None'} />
+      <Row l="Type" v={CAKE_TYPE_LABELS[cake.cakeType] || '—'} />
+      <Row l="Allergies" v={allergyDisplay(cake.allergies, cake.allergyOther)} />
       <Row l="Date" v={fmtDate(cake.date)} />
       <Row l="Time" v={fmtHour(cake.hour)} />
       {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}

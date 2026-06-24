@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ref, onValue } from 'firebase/database';
+import { allergyDisplay, CAKE_TYPE_LABELS } from '../../constants/eventPricing';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../lib/firebase';
 
@@ -11,11 +12,6 @@ const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const TYPE_LABELS: Record<string, string> = {
-  round: 'Round', tall_round: 'Tall Round', tall_flat: 'Tall Flat', square_flat: 'Square Flat',
-  tiered: 'Tiered', sheet: 'Sheet Cake', heart: 'Heart Shaped', number: 'Number/Alphabet',
-  cupcake_tower: 'Cupcake Tower', sculpted: 'Sculpted',
-};
 function fmtDate(d: any) { return d ? `${d.day} ${MONTH_NAMES[d.month]} ${d.year}` : '—'; }
 function fmtHour(h: any) {
   if (!h) return '—';
@@ -50,9 +46,11 @@ function CakeBlock({ cake }: { cake: any }) {
       <Text style={s.cakeBoxTitle}>Custom Cake</Text>
       <Row l="Occasion" v={cake.occasion === 'Other' ? cake.occasionOther : (cake.occasion || '—')} />
       <Row l="Cake Parts" v={String(cake.cakeParts ?? '—')} />
-      <Row l="Flavour" v={cake.flavour === 'Other' ? cake.flavourOther : (cake.flavour || '—')} />
-      <Row l="Type" v={cake.cakeType === 'number' ? cake.cakeTypeOther : (TYPE_LABELS[cake.cakeType] || '—')} />
-      <Row l="Allergies" v={cake.allergies?.length ? cake.allergies.join(', ') + (cake.allergyOther ? ` (${cake.allergyOther})` : '') : 'None'} />
+      <Row l="Flavour" v={(cake.flavours || []).join(', ') || '—'} />
+      <Row l="Decoration" v={(cake.decorations || []).join(', ') || '—'} />
+      <Row l="Text" v={cake.cakeText?.trim() || 'None'} />
+      <Row l="Type" v={CAKE_TYPE_LABELS[cake.cakeType] || '—'} />
+      <Row l="Allergies" v={allergyDisplay(cake.allergies, cake.allergyOther)} />
       <Row l="Date" v={fmtDate(cake.date)} />
       <Row l="Time" v={fmtHour(cake.hour)} />
       {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}
@@ -67,12 +65,14 @@ function OrderRow({ order }: { order: Order }) {
   const { label, color, icon } = statusLabel(order);
   const remaining = order.cakeRemaining ?? 0;
 
+  const cakeNames = (order.items || []).map(i => i.name).join(', ') || 'Custom Cake';
+
   return (
     <View style={s.card}>
+      {/* Collapsed header: name + status */}
       <View style={s.cardTop}>
         <View style={s.cardTopLeft}>
-          <Text style={s.cardDate}>{order.date}</Text>
-          <Text style={s.cardType}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
+          <Text style={s.cakeTitle}>{cakeNames}</Text>
         </View>
         <View style={[s.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
           <Ionicons name={icon as any} size={13} color={color} />
@@ -80,32 +80,7 @@ function OrderRow({ order }: { order: Order }) {
         </View>
       </View>
 
-      <View style={s.divider} />
-
-      {order.items?.map((item, i) => (
-        <View key={i}>
-          <View style={s.itemRow}>
-            <Text style={s.itemName}>{item.quantity}× {item.name}</Text>
-            <Text style={s.itemPrice}>P {item.price * item.quantity}.00</Text>
-          </View>
-        </View>
-      ))}
-
-      {order.items?.some(i => i.cakeOrder) && (
-        <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
-          <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} cake details</Text>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
-        </TouchableOpacity>
-      )}
-      {open && order.items?.filter(i => i.cakeOrder).map((i, idx) => <CakeBlock key={idx} cake={i.cakeOrder} />)}
-
-      <View style={s.divider} />
-
-      <View style={s.totalRow}>
-        <Text style={s.totalLabel}>Paid Now</Text>
-        <Text style={s.totalVal}>P {order.total}.00</Text>
-      </View>
-
+      {/* Collapsed: remaining balance (red) or paid (green) */}
       {remaining > 0 && (
         order.paid ? (
           <View style={[s.balancePill, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
@@ -115,9 +90,41 @@ function OrderRow({ order }: { order: Order }) {
         ) : (
           <View style={[s.balancePill, { backgroundColor: '#C65C6922', borderColor: '#C65C69' }]}>
             <Ionicons name="alert-circle" size={16} color="#C65C69" />
-            <Text style={[s.balanceText, { color: '#C65C69' }]}>Remaining Balance: P {remaining}.00</Text>
+            <Text style={[s.balanceText, { color: '#C65C69' }]}>Remaining to be Paid: P {remaining}.00</Text>
           </View>
         )
+      )}
+
+      {/* Dropdown toggle */}
+      <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
+        <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
+      </TouchableOpacity>
+
+      {/* Expanded: full summary */}
+      {open && (
+        <View>
+          <View style={s.divider} />
+          <View style={s.itemRow}>
+            <Text style={s.itemName}>{order.date}</Text>
+            <Text style={s.itemPrice}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
+          </View>
+          <View style={s.divider} />
+
+          {order.items?.filter(i => i.cakeOrder).map((i, idx) => <CakeBlock key={idx} cake={i.cakeOrder} />)}
+
+          <View style={s.divider} />
+          <View style={s.totalRow}>
+            <Text style={s.totalLabel}>Paid Now</Text>
+            <Text style={s.totalVal}>P {order.total}.00</Text>
+          </View>
+          {remaining > 0 && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Remaining (on collection)</Text>
+              <Text style={s.totalVal}>P {remaining}.00</Text>
+            </View>
+          )}
+        </View>
       )}
     </View>
   );
@@ -185,7 +192,8 @@ const s = StyleSheet.create({
   shopBtnText:  { fontSize: 15, fontWeight: '700', color: '#fff' },
   card:         { backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 16, elevation: 2 },
   cardTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
-  cardTopLeft:  { gap: 2 },
+  cardTopLeft:  { gap: 2, flex: 1, paddingRight: 10 },
+  cakeTitle:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   cardDate:     { fontSize: 13, fontWeight: '700', color: '#1a1612' },
   cardType:     { fontSize: 12, color: '#6b6b6b' },
   statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },

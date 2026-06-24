@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../../context/CartContext';
@@ -13,12 +13,12 @@ const PINK_MID   = '#E9ABAE';
 // Swap icon for a real image later: add `images: [require('../../assets/images/...')]`
 // and change PlaceholderTile usages to <Image source={...} />
 const PRODUCTS = [
-  { id: 'p1', name: 'Classic Vanilla Cupcake', description: 'Light vanilla sponge with buttercream swirl.', details: 'Light vanilla sponge with vanilla bean buttercream swirl, topped with sprinkles.', price: 25, icon: 'flower-outline' as const },
-  { id: 'p2', name: 'Chocolate Fudge Cupcake', description: 'Rich chocolate sponge, fudge frosting.', details: 'Rich double chocolate sponge with fudge frosting and chocolate shavings.', price: 28, icon: 'flower-outline' as const },
-  { id: 'p3', name: 'Croissant', description: 'Buttery, flaky, freshly baked daily.', details: 'Classic French butter croissant, baked fresh every morning.', price: 22, icon: 'cafe-outline' as const },
-  { id: 'p4', name: 'Macaron Box (6pc)', description: 'Assorted flavours, delicate shells.', details: 'Box of 6 assorted macarons — pistachio, raspberry, vanilla, chocolate, lemon, salted caramel.', price: 90, icon: 'ellipse-outline' as const },
-  { id: 'p5', name: 'Fruit Tart', description: 'Crisp pastry shell, custard, fresh fruit.', details: 'Crisp shortcrust pastry filled with vanilla custard and topped with fresh seasonal fruit.', price: 45, icon: 'pie-chart-outline' as const },
-  { id: 'p6', name: 'Red Velvet Slice', description: 'Classic red velvet with cream cheese icing.', details: 'Moist red velvet cake slice layered with cream cheese frosting.', price: 35, icon: 'restaurant-outline' as const },
+  { id: 'p1', image: require('../../assets/carousel/Cake4.jpeg'), name: 'Strawberry Cream Cake', description: 'Vanilla cream cake with fresh strawberries.', price: 0, icon: 'flower-outline' as const, details: 'Vanilla cream cake layered with fresh strawberries.' },
+  { id: 'p2', image: require('../../assets/carousel/Cake6.jpeg'), name: 'Vanilla Swiss Roll', description: 'Soft sponge rolled with vanilla cream.', price: 0, icon: 'flower-outline' as const, details: 'Light vanilla sponge rolled with smooth vanilla cream.' },
+  { id: 'p3', image: require('../../assets/carousel/Cake5.jpeg'), name: 'Tiramisu Trifle', description: 'Coffee layers with mascarpone cream.', price: 0, icon: 'cafe-outline' as const, details: 'Coffee-soaked sponge layered with mascarpone cream and cocoa.' },
+  { id: 'p4', image: require('../../assets/carousel/Cake8.jpeg'), name: 'Strawberry Swiss Roll', description: 'Sponge rolled with strawberries and cream.', price: 0, icon: 'flower-outline' as const, details: 'Soft vanilla sponge rolled with fresh strawberries and cream.' },
+  { id: 'p5', image: require('../../assets/carousel/Cake2.jpeg'), name: 'Strawberry Trifle', description: 'Layered berries, cream and sponge.', price: 0, icon: 'ellipse-outline' as const, details: 'Individual cup of layered sponge, fresh berries and cream.' },
+  { id: 'p6', image: require('../../assets/carousel/Cake7.jpeg'), name: 'Fruit Tart', description: 'Crisp pastry with custard and fresh fruit.', price: 0, icon: 'pie-chart-outline' as const, details: 'Crisp shortcrust shell with custard and fresh seasonal fruit.' },
 ];
 
 function PlaceholderTile({ icon, size }: { icon: keyof typeof Ionicons.glyphMap; size: number }) {
@@ -33,10 +33,7 @@ const ph = StyleSheet.create({
 });
 
 function ProductModal({ product, onClose }: { product: typeof PRODUCTS[0] | null; onClose: () => void }) {
-  const { addToCart, removeFromCart, items } = useCart();
   if (!product) return null;
-  const qty = items.find(i => i.id === product.id)?.quantity ?? 0;
-  const inCart = qty > 0;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -44,7 +41,7 @@ function ProductModal({ product, onClose }: { product: typeof PRODUCTS[0] | null
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View style={modal.sheet}>
           <View style={modal.imageBox}>
-            <PlaceholderTile icon={product.icon} size={SW} />
+            <Image source={product.image} style={{ width: SW, height: SW }} resizeMode="cover" />
             <TouchableOpacity style={modal.backBtn} onPress={onClose}>
               <Ionicons name="arrow-back" size={18} color="#1a1612" />
               <Text style={modal.backBtnText}>Back</Text>
@@ -54,32 +51,11 @@ function ProductModal({ product, onClose }: { product: typeof PRODUCTS[0] | null
             <Text style={modal.name}>{product.name}</Text>
             <Text style={modal.desc}>{product.details}</Text>
             <View style={modal.priceRow}>
-              <Text style={modal.price}>P {product.price}.00</Text>
             </View>
-            {!inCart ? (
-              <TouchableOpacity
-                style={modal.addBtn}
-                onPress={() => addToCart(product.id, { id: product.id, name: product.name, price: product.price, icon: 'restaurant' })}
-              >
-                <Ionicons name="cart" size={20} color="#fff" />
-                <Text style={modal.addBtnTxt}>Add to Cart</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={modal.cartControls}>
-                <TouchableOpacity style={modal.removeBtn} onPress={() => { for (let i = 0; i < qty; i++) removeFromCart(product.id); }}>
-                  <Text style={modal.removeBtnTxt}>Remove</Text>
-                </TouchableOpacity>
-                <View style={modal.qtyRow}>
-                  <TouchableOpacity style={modal.qtyBtn} onPress={() => removeFromCart(product.id)}>
-                    <Ionicons name="remove" size={18} color="#1a1612" />
-                  </TouchableOpacity>
-                  <Text style={modal.qtyText}>{qty}</Text>
-                  <TouchableOpacity style={modal.qtyBtn} onPress={() => addToCart(product.id, { id: product.id, name: product.name, price: product.price, icon: 'restaurant' })}>
-                    <Ionicons name="add" size={18} color="#1a1612" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+            <View style={modal.pickupNote}>
+              <Ionicons name="storefront" size={18} color={PINK_DARK} />
+              <Text style={modal.pickupNoteTxt}>Pickup Only — available in-store</Text>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -125,12 +101,14 @@ export default function Menu() {
         {filtered.map(product => (
           <TouchableOpacity key={product.id} style={s.card} onPress={() => setActiveProduct(product)} activeOpacity={0.88}>
             <View style={s.cardImgWrap}>
-              <PlaceholderTile icon={product.icon} size={Math.round((SW - 40) * 0.6)} />
+              <Image source={product.image} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             </View>
             <View style={s.cardBody}>
               <Text style={s.cardName}>{product.name}</Text>
               <Text style={s.cardDesc} numberOfLines={2}>{product.description}</Text>
-              <Text style={s.cardPrice}>P {product.price}.00</Text>
+              <View style={s.cardBottomRow}>
+                <View style={s.pickupChip}><Text style={s.pickupChipTxt}>Pickup Only</Text></View>
+              </View>
             </View>
           </TouchableOpacity>
         ))}
@@ -162,6 +140,9 @@ const s = StyleSheet.create({
   cardName:     { fontSize: 17, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   cardDesc:     { fontSize: 13, color: '#6b6b6b', lineHeight: 19, marginBottom: 8 },
   cardPrice:    { fontSize: 16, fontWeight: '800', color: PINK_DARK },
+  cardBottomRow:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  pickupChip:   { backgroundColor: PINK_LIGHT, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: PINK_MID },
+  pickupChipTxt:{ fontSize: 11, fontWeight: '800', color: PINK_DARK },
 });
 
 const modal = StyleSheet.create({
@@ -183,4 +164,6 @@ const modal = StyleSheet.create({
   qtyRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, backgroundColor: PINK_LIGHT, borderRadius: 14, paddingVertical: 12 },
   qtyBtn:       { padding: 4 },
   qtyText:      { fontSize: 18, fontWeight: '800', color: '#1a1612', minWidth: 24, textAlign: 'center' },
+  pickupNote:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PINK_LIGHT, borderRadius: 14, paddingVertical: 16, marginBottom: 24 },
+  pickupNoteTxt:{ fontSize: 15, fontWeight: '800', color: PINK_DARK },
 });

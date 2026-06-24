@@ -1,192 +1,144 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Dimensions, FlatList, Image, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  FLAVOURS, DECORATIONS, OCCASIONS, ALLERGY_OPTIONS, CAKE_TYPES,
+  PART_COUNTS, CAKE_TYPE_LABELS, allergyDisplay, CakeData,
+} from '../../constants/eventPricing';
+import { CAROUSEL_IMAGES } from '../../constants/carousel';
 
 const { width: SW } = Dimensions.get('window');
 const PINK_DARK   = '#CE6F79';
 const PINK_LIGHT  = '#FADAD9';
 const PINK_MID    = '#E9ABAE';
-const PINK_DEEPER = '#D78289';
 
 const EVENT_ITEM = Math.round(SW / 2.3);
-
-const CAROUSEL_ITEMS = [
-  { id: 'c1', icon: 'gift-outline' as const },
-  { id: 'c2', icon: 'flower-outline' as const },
-  { id: 'c3', icon: 'cafe-outline' as const },
-  { id: 'c4', icon: 'heart-outline' as const },
-  { id: 'c5', icon: 'ellipse-outline' as const },
-  { id: 'c6', icon: 'pie-chart-outline' as const },
-];
-
-const OCCASIONS = ['Birthday', 'Party', 'Wedding', 'Corporate', 'Other'];
-const FLAVOURS = ['Chocolate', 'Vanilla', 'Coffee', 'Fruit', 'Lemon', 'Other', 'None / Skip'];
-const PART_COUNTS = Array.from({ length: 25 }, (_, i) => 4 + i * 4); // 4..100 step 4
-
-const CAKE_TYPES = [
-  { id: 'round',         label: 'Round',           icon: 'ellipse-outline' as const },
-  { id: 'tall_round',    label: 'Tall Round',      icon: 'ellipse-outline' as const },
-  { id: 'tall_flat',     label: 'Tall Flat',       icon: 'square-outline' as const },
-  { id: 'square_flat',   label: 'Square Flat',     icon: 'square-outline' as const },
-  { id: 'tiered',        label: 'Tiered',          icon: 'layers-outline' as const },
-  { id: 'sheet',         label: 'Sheet Cake',      icon: 'tablet-landscape-outline' as const },
-  { id: 'heart',         label: 'Heart Shaped',    icon: 'heart-outline' as const },
-  { id: 'number',        label: 'Number/Alphabet', icon: 'text-outline' as const },
-  { id: 'cupcake_tower', label: 'Cupcake Tower',   icon: 'gift-outline' as const },
-  { id: 'sculpted',      label: 'Sculpted',        icon: 'shapes-outline' as const },
-];
-
-const ALLERGY_OPTIONS = ['Gluten', 'Almond', 'Peanuts', 'Dairy', 'Eggs', 'Soy', 'Other', 'None'];
-
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-function firstWeekday(year: number, month: number) {
-  return new Date(year, month, 1).getDay();
-}
+const CAROUSEL_ITEMS = [
+  { id: 'c1', icon: 'gift-outline' as const }, { id: 'c2', icon: 'flower-outline' as const },
+  { id: 'c3', icon: 'cafe-outline' as const }, { id: 'c4', icon: 'heart-outline' as const },
+  { id: 'c5', icon: 'ellipse-outline' as const }, { id: 'c6', icon: 'pie-chart-outline' as const },
+];
+
+function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
+function firstWeekday(y: number, m: number) { return new Date(y, m, 1).getDay(); }
 
 function PlaceholderTile({ icon, size }: { icon: keyof typeof Ionicons.glyphMap; size: number }) {
-  return (
-    <View style={[ph.tile, { width: size, height: size }]}>
-      <Ionicons name={icon} size={size * 0.4} color={PINK_DARK} />
-    </View>
-  );
+  return <View style={[ph.tile, { width: size, height: size }]}><Ionicons name={icon} size={size * 0.4} color={PINK_DARK} /></View>;
 }
-const ph = StyleSheet.create({
-  tile: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: PINK_MID },
-});
+const ph = StyleSheet.create({ tile: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: PINK_MID } });
 
-export type EventOrderData = {
-  occasion: string | null;
-  occasionOther: string;
-  cakeParts: number | null;
-  flavour: string | null;
-  flavourOther: string;
-  cakeType: string | null;
-  cakeTypeOther: string;
-  allergies: string[];
-  allergyOther: string;
-  date: { year: number; month: number; day: number } | null;
-  hour: { h: number; m: number } | null;
-};
-
-const STEPS = ['intro', 'occasion', 'parts', 'flavour', 'type', 'allergies', 'date', 'hour', 'recall'] as const;
+const STEPS = ['intro','occasion','parts','flavour','decoration','text','type','allergies','date','hour','recall'] as const;
 type Step = typeof STEPS[number];
 
 export default function EventBuilder() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ editId?: string; editData?: string }>();
+  const editId = params.editId || null;
+  const preset: Partial<CakeData> = params.editData ? JSON.parse(params.editData) : {};
+
   const [stepIdx, setStepIdx] = useState(0);
   const step = STEPS[stepIdx];
 
-  const [data, setData] = useState<EventOrderData>({
-    occasion: null,
-    occasionOther: '',
-    cakeParts: null,
-    flavour: null,
-    flavourOther: '',
-    cakeType: null,
-    cakeTypeOther: '',
-    allergies: [],
-    allergyOther: '',
-    date: null,
-    hour: null,
+  const [data, setData] = useState<CakeData>({
+    occasion: preset.occasion ?? null,
+    occasionOther: preset.occasionOther ?? '',
+    cakeParts: preset.cakeParts ?? null,
+    flavours: preset.flavours ?? [],
+    decorations: preset.decorations ?? [],
+    cakeText: preset.cakeText ?? '',
+    cakeType: preset.cakeType ?? null,
+    allergies: preset.allergies ?? [],
+    allergyOther: preset.allergyOther ?? '',
+    date: preset.date ?? null,
+    hour: preset.hour ?? null,
   });
-  const [typePage, setTypePage] = useState(0);
+
+  // "OK confirmed" flags for the specify boxes (turn the OK button green + tick)
+  const [occOk, setOccOk]   = useState(!!preset.occasionOther);
+  const [algOk, setAlgOk]   = useState(!!preset.allergyOther);
+  const [txtOk, setTxtOk]   = useState(!!preset.cakeText);
+
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
-  const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [hourVal, setHourVal] = useState(12);
-  const [minuteVal, setMinuteVal] = useState(0);
-  const [hourPicked, setHourPicked] = useState(false);
-  const [minutePicked, setMinutePicked] = useState(false);
+  const [calYear, setCalYear]   = useState(new Date().getFullYear());
+  const [hourVal, setHourVal]   = useState(preset.hour?.h ?? 12);
+  const [minuteVal, setMinuteVal] = useState(preset.hour?.m ?? 0);
+  const [hourPicked, setHourPicked]     = useState(!!preset.hour);
+  const [minutePicked, setMinutePicked] = useState(!!preset.hour);
 
   const flatRef = useRef<FlatList>(null);
-  const LOOPED = [...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS, ...CAROUSEL_ITEMS];
-  const START = CAROUSEL_ITEMS.length;
+  const LOOPED = [...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES];
+  const START = CAROUSEL_IMAGES.length;
 
-  useEffect(() => {
-    try { flatRef.current?.scrollToIndex({ index: START, animated: false }); } catch {}
-  }, []);
-
+  useEffect(() => { try { flatRef.current?.scrollToIndex({ index: START, animated: false }); } catch {} }, []);
   useEffect(() => {
     if (step !== 'intro') return;
     let idx = 0;
-    const t = setInterval(() => {
-      idx += 1;
-      try { flatRef.current?.scrollToIndex({ index: START + (idx % CAROUSEL_ITEMS.length), animated: true }); } catch {}
-    }, 2000);
+    const t = setInterval(() => { idx += 1; try { flatRef.current?.scrollToIndex({ index: START + (idx % CAROUSEL_IMAGES.length), animated: true }); } catch {} }, 2000);
     return () => clearInterval(t);
   }, [step]);
 
+  const toggleIn = (key: 'flavours' | 'decorations', opt: string) =>
+    setData(d => ({ ...d, [key]: d[key].includes(opt) ? d[key].filter(x => x !== opt) : [...d[key], opt] }));
+
+  const toggleAllergy = (opt: string) => setData(d => {
+    const checked = d.allergies.includes(opt);
+    if (opt === 'None') return { ...d, allergies: checked ? [] : ['None'], allergyOther: checked ? d.allergyOther : '' };
+    const base = d.allergies.filter(a => a !== 'None');
+    return { ...d, allergies: base.includes(opt) ? base.filter(a => a !== opt) : [...base, opt] };
+  });
+
   const canGoNext = (): boolean => {
-    if (step === 'occasion') return !!data.occasion && (data.occasion !== 'Other' || data.occasionOther.trim().length > 0);
-    if (step === 'parts') return !!data.cakeParts;
-    if (step === 'flavour') return !!data.flavour && (data.flavour !== 'Other' || data.flavourOther.trim().length > 0);
-    if (step === 'type') return !!data.cakeType && (data.cakeType !== 'number' || data.cakeTypeOther.trim().length > 0);
-    if (step === 'allergies') return data.allergies.length > 0;
-    if (step === 'date') return !!data.date;
-    if (step === 'hour') return hourPicked && minutePicked;
-    return true;
+    switch (step) {
+      case 'occasion':   return !!data.occasion && (data.occasion !== 'Other' || (data.occasionOther.trim().length > 0 && occOk));
+      case 'parts':      return !!data.cakeParts;
+      case 'flavour':    return data.flavours.length > 0;
+      case 'decoration': return data.decorations.length > 0;
+      case 'text':       return true; // skippable
+      case 'type':       return !!data.cakeType;
+      case 'allergies':  return data.allergies.length > 0 && (!data.allergies.includes('Other') || (data.allergyOther.trim().length > 0 && algOk));
+      case 'date':       return !!data.date;
+      case 'hour':       return hourPicked && minutePicked;
+      default:           return true;
+    }
   };
 
   const goNext = () => { if (stepIdx < STEPS.length - 1) setStepIdx(i => i + 1); };
-  const goBack = () => {
-    if (stepIdx === 0) { router.push('/tabs'); return; }
-    setStepIdx(i => i - 1);
-  };
+  const goBack = () => { if (stepIdx === 0) { router.push('/tabs'); return; } setStepIdx(i => i - 1); };
 
-  const toggleAllergy = (opt: string) => {
-    setData(d => {
-      const checked = d.allergies.includes(opt);
-      if (opt === 'None') {
-        return { ...d, allergies: checked ? [] : ['None'], allergyOther: checked ? d.allergyOther : '' };
-      }
-      const base = d.allergies.filter(a => a !== 'None');
-      const has = base.includes(opt);
-      return { ...d, allergies: has ? base.filter(a => a !== opt) : [...base, opt] };
-    });
-  };
+  const OkButton = ({ done, onPress }: { done: boolean; onPress: () => void }) => (
+    <TouchableOpacity style={[s.okBtn, done && s.okBtnDone]} onPress={onPress}>
+      {done ? <Ionicons name="checkmark" size={18} color="#fff" /> : <Text style={s.okBtnText}>OK</Text>}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={s.container}>
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color="#1a1612" />
-          <Text style={s.backText}>Back</Text>
+          <Ionicons name="arrow-back" size={24} color="#1a1612" /><Text style={s.backText}>Back</Text>
         </TouchableOpacity>
-        <View style={s.headerCenter}>
-          <Text style={s.title}>Plan Your Event Cake</Text>
-        </View>
+        <View style={s.headerCenter}><Text style={s.title}>Plan Your Event Cake</Text></View>
         <View style={{ width: 70 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
         {step === 'intro' && (
           <>
             <View style={s.carouselWrap}>
-              <FlatList
-                ref={flatRef}
-                data={LOOPED}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(item, i) => `${item.id}-${i}`}
+              <FlatList ref={flatRef} data={LOOPED} horizontal showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, i) => `c-${i}`}
                 getItemLayout={(_, i) => ({ length: EVENT_ITEM + 8, offset: (EVENT_ITEM + 8) * i, index: i })}
                 onScrollToIndexFailed={() => {}}
-                renderItem={({ item }) => (
-                  <View style={s.carouselItem}>
-                    <PlaceholderTile icon={item.icon} size={EVENT_ITEM} />
-                  </View>
-                )}
-              />
+                renderItem={({ item }) => <View style={s.carouselItem}><Image source={item} style={{ width: EVENT_ITEM, height: EVENT_ITEM }} resizeMode="cover" /></View>} />
             </View>
             <Text style={s.introHeading}>Custom Event Cake</Text>
             <Text style={s.introText}>Let's build your perfect event cake, step by step.</Text>
-            <TouchableOpacity style={s.introStartBtn} onPress={goNext} activeOpacity={0.85}>
-              <Text style={s.introStartText}>Let's Start</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <TouchableOpacity style={s.introStartBtn} onPress={goNext}>
+              <Text style={s.introStartText}>Let's Start</Text><Ionicons name="arrow-forward" size={20} color="#fff" />
             </TouchableOpacity>
           </>
         )}
@@ -196,27 +148,16 @@ export default function EventBuilder() {
             <Text style={s.sectionTitle}>What's the occasion?</Text>
             {OCCASIONS.map(opt => (
               <View key={opt}>
-                <TouchableOpacity
-                  style={[s.optionRow, data.occasion === opt && s.optionRowActive]}
-                  onPress={() => setData(d => ({ ...d, occasion: opt }))}
-                >
-                  <View style={[s.radio, data.occasion === opt && s.radioActive]}>
-                    {data.occasion === opt && <View style={s.radioDot} />}
-                  </View>
+                <TouchableOpacity style={[s.optionRow, data.occasion === opt && s.optionRowActive]} onPress={() => setData(d => ({ ...d, occasion: opt }))}>
+                  <View style={[s.radio, data.occasion === opt && s.radioActive]}>{data.occasion === opt && <View style={s.radioDot} />}</View>
                   <Text style={[s.optionText, data.occasion === opt && s.optionTextActive]}>{opt}</Text>
                 </TouchableOpacity>
                 {opt === 'Other' && data.occasion === 'Other' && (
                   <View style={s.specifyRow}>
-                    <TextInput
-                      style={s.specifyInput}
-                      placeholder="Specify occasion..."
-                      placeholderTextColor="#aaa"
+                    <TextInput style={s.specifyInput} placeholder="Specify occasion..." placeholderTextColor="#aaa"
                       value={data.occasionOther}
-                      onChangeText={v => setData(d => ({ ...d, occasionOther: v }))}
-                    />
-                    <TouchableOpacity style={s.okBtn}>
-                      <Text style={s.okBtnText}>OK</Text>
-                    </TouchableOpacity>
+                      onChangeText={v => { setData(d => ({ ...d, occasionOther: v })); setOccOk(false); }} />
+                    <OkButton done={occOk} onPress={() => { if (data.occasionOther.trim()) { setOccOk(true); Keyboard.dismiss(); } }} />
                   </View>
                 )}
               </View>
@@ -226,17 +167,14 @@ export default function EventBuilder() {
 
         {step === 'parts' && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Number of Cake Parts</Text>
+            <Text style={s.sectionTitle}>Number of Cake Parts <Text style={s.faint}>(Number of People)</Text></Text>
             <View style={s.partsTopImage}>
-              <PlaceholderTile icon="layers-outline" size={100} />
+              {/* DEMO IMAGE — replace assets/cake-parts.png with your real one (keep the name) */}
+              <Image source={require('../../assets/cake-parts.png')} style={{ width: 110, height: 110, borderRadius: 12 }} resizeMode="cover" />
             </View>
             <ScrollView style={s.partsScrollerFull} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
               {PART_COUNTS.map(n => (
-                <TouchableOpacity
-                  key={n}
-                  style={[s.partOption, data.cakeParts === n && s.partOptionActive]}
-                  onPress={() => setData(d => ({ ...d, cakeParts: n }))}
-                >
+                <TouchableOpacity key={n} style={[s.partOption, data.cakeParts === n && s.partOptionActive]} onPress={() => setData(d => ({ ...d, cakeParts: n }))}>
                   <Text style={[s.partOptionText, data.cakeParts === n && s.partOptionTextActive]}>{n}</Text>
                 </TouchableOpacity>
               ))}
@@ -246,86 +184,68 @@ export default function EventBuilder() {
 
         {step === 'flavour' && (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Flavour</Text>
-            {FLAVOURS.map(opt => (
-              <View key={opt}>
-                <TouchableOpacity
-                  style={[s.optionRow, data.flavour === opt && s.optionRowActive]}
-                  onPress={() => setData(d => ({ ...d, flavour: opt }))}
-                >
-                  <View style={[s.radio, data.flavour === opt && s.radioActive]}>
-                    {data.flavour === opt && <View style={s.radioDot} />}
-                  </View>
-                  <Text style={[s.optionText, data.flavour === opt && s.optionTextActive]}>{opt}</Text>
+            <Text style={s.sectionTitle}>Flavour <Text style={s.faint}>(select one or more)</Text></Text>
+            {FLAVOURS.map(opt => {
+              const checked = data.flavours.includes(opt);
+              return (
+                <TouchableOpacity key={opt} style={[s.optionRow, checked && s.optionRowActive]} onPress={() => toggleIn('flavours', opt)}>
+                  <View style={[s.checkbox, checked && s.checkboxActive]}>{checked && <Ionicons name="checkmark" size={14} color="#fff" />}</View>
+                  <Text style={[s.optionText, checked && s.optionTextActive]}>{opt}</Text>
                 </TouchableOpacity>
-                {opt === 'Other' && data.flavour === 'Other' && (
-                  <View style={s.specifyRow}>
-                    <TextInput
-                      style={s.specifyInput}
-                      placeholder="Specify flavour..."
-                      placeholderTextColor="#aaa"
-                      value={data.flavourOther}
-                      onChangeText={v => setData(d => ({ ...d, flavourOther: v }))}
-                    />
-                    <TouchableOpacity style={s.okBtn}>
-                      <Text style={s.okBtnText}>OK</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ))}
+              );
+            })}
+          </View>
+        )}
+
+        {step === 'decoration' && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Decoration <Text style={s.faint}>(select one or more)</Text></Text>
+            {DECORATIONS.map(opt => {
+              const checked = data.decorations.includes(opt);
+              return (
+                <TouchableOpacity key={opt} style={[s.optionRow, checked && s.optionRowActive]} onPress={() => toggleIn('decorations', opt)}>
+                  <View style={[s.checkbox, checked && s.checkboxActive]}>{checked && <Ionicons name="checkmark" size={14} color="#fff" />}</View>
+                  <Text style={[s.optionText, checked && s.optionTextActive]}>{opt}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {step === 'text' && (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Text on the Cake</Text>
+            <Text style={s.fancyPreview}>{data.cakeText.trim() ? data.cakeText : 'Your message here'}</Text>
+            <View style={s.specifyRow}>
+              <TextInput style={s.specifyInput} placeholder="e.g. Happy Birthday Lisa!" placeholderTextColor="#aaa"
+                value={data.cakeText}
+                onChangeText={v => { setData(d => ({ ...d, cakeText: v })); setTxtOk(false); }} />
+              <OkButton done={txtOk} onPress={() => { if (data.cakeText.trim()) { setTxtOk(true); Keyboard.dismiss(); } }} />
+            </View>
+            <TouchableOpacity style={s.skipBtn} onPress={() => { setData(d => ({ ...d, cakeText: '' })); setTxtOk(false); goNext(); }}>
+              <Text style={s.skipBtnText}>Skip — no text</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {step === 'type' && (
           <View style={s.section}>
             <Text style={s.sectionTitle}>Type of Cake</Text>
-            <View style={s.typeGrid}>
-              {CAKE_TYPES.slice(typePage * 6, typePage * 6 + 6).map(t => (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[s.typeCard, data.cakeType === t.id && s.typeCardActive]}
-                  onPress={() => setData(d => ({ ...d, cakeType: t.id }))}
-                >
-                  <Ionicons name={t.icon} size={34} color={data.cakeType === t.id ? '#fff' : PINK_DARK} />
-                  <Text style={[s.typeLabel, data.cakeType === t.id && s.typeLabelActive]}>{t.label}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={s.typeStack}>
+              {CAKE_TYPES.map(t => {
+                const active = data.cakeType === t.id;
+                return (
+                  <TouchableOpacity key={t.id} style={[s.typeBox, active && s.typeBoxActive]} onPress={() => setData(d => ({ ...d, cakeType: t.id }))} activeOpacity={0.9}>
+                    {/* DEMO IMAGE — replace assets/cake-<id>.png with your real ones (keep names) */}
+                    <Image source={t.image} style={s.typeImage} resizeMode="cover" />
+                    <View style={s.selectDotWrap}>
+                      <View style={[s.selectDot, active && s.selectDotActive]}>{active && <Ionicons name="checkmark" size={16} color="#fff" />}</View>
+                    </View>
+                    <View style={s.typeLabelBar}><Text style={[s.typeLabelText, active && { color: '#fff' }]}>{t.label}</Text></View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <View style={s.typeSwipeRow}>
-              <TouchableOpacity
-                style={[s.typeArrow, typePage === 0 && s.typeArrowDisabled]}
-                disabled={typePage === 0}
-                onPress={() => setTypePage(0)}
-              >
-                <Ionicons name="chevron-back" size={20} color={typePage === 0 ? '#ccc' : PINK_DARK} />
-              </TouchableOpacity>
-              <View style={s.dotsRow}>
-                <View style={[s.dot, typePage === 0 && s.dotActive]} />
-                <View style={[s.dot, typePage === 1 && s.dotActive]} />
-              </View>
-              <TouchableOpacity
-                style={[s.typeArrow, typePage === 1 && s.typeArrowDisabled]}
-                disabled={typePage === 1}
-                onPress={() => setTypePage(1)}
-              >
-                <Ionicons name="chevron-forward" size={20} color={typePage === 1 ? '#ccc' : PINK_DARK} />
-              </TouchableOpacity>
-            </View>
-            {data.cakeType === 'number' && (
-              <View style={s.specifyRow}>
-                <TextInput
-                  style={s.specifyInput}
-                  placeholder="Specify number/letters..."
-                  placeholderTextColor="#aaa"
-                  value={data.cakeTypeOther}
-                  onChangeText={v => setData(d => ({ ...d, cakeTypeOther: v }))}
-                />
-                <TouchableOpacity style={s.okBtn}>
-                  <Text style={s.okBtnText}>OK</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
 
@@ -336,27 +256,16 @@ export default function EventBuilder() {
               const checked = data.allergies.includes(opt);
               return (
                 <View key={opt}>
-                  <TouchableOpacity
-                    style={[s.optionRow, checked && s.optionRowActive]}
-                    onPress={() => toggleAllergy(opt)}
-                  >
-                    <View style={[s.checkbox, checked && s.checkboxActive]}>
-                      {checked && <Ionicons name="checkmark" size={14} color="#fff" />}
-                    </View>
+                  <TouchableOpacity style={[s.optionRow, checked && s.optionRowActive]} onPress={() => toggleAllergy(opt)}>
+                    <View style={[s.checkbox, checked && s.checkboxActive]}>{checked && <Ionicons name="checkmark" size={14} color="#fff" />}</View>
                     <Text style={[s.optionText, checked && s.optionTextActive]}>{opt}</Text>
                   </TouchableOpacity>
                   {opt === 'Other' && checked && (
                     <View style={s.specifyRow}>
-                      <TextInput
-                        style={s.specifyInput}
-                        placeholder="Specify allergy..."
-                        placeholderTextColor="#aaa"
+                      <TextInput style={s.specifyInput} placeholder="Specify allergy..." placeholderTextColor="#aaa"
                         value={data.allergyOther}
-                        onChangeText={v => setData(d => ({ ...d, allergyOther: v }))}
-                      />
-                      <TouchableOpacity style={s.okBtn}>
-                        <Text style={s.okBtnText}>OK</Text>
-                      </TouchableOpacity>
+                        onChangeText={v => { setData(d => ({ ...d, allergyOther: v })); setAlgOk(false); }} />
+                      <OkButton done={algOk} onPress={() => { if (data.allergyOther.trim()) { setAlgOk(true); Keyboard.dismiss(); } }} />
                     </View>
                   )}
                 </View>
@@ -370,36 +279,22 @@ export default function EventBuilder() {
             <Text style={s.sectionTitle}>Date</Text>
             <View style={s.calCard}>
               <View style={s.calHeader}>
-                <TouchableOpacity onPress={() => {
-                  if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
-                  else setCalMonth(m => m - 1);
-                }}>
+                <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}>
                   <Ionicons name="chevron-back" size={22} color={PINK_DARK} />
                 </TouchableOpacity>
                 <Text style={s.calMonthLabel}>{MONTH_NAMES[calMonth]} {calYear}</Text>
-                <TouchableOpacity onPress={() => {
-                  if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
-                  else setCalMonth(m => m + 1);
-                }}>
+                <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}>
                   <Ionicons name="chevron-forward" size={22} color={PINK_DARK} />
                 </TouchableOpacity>
               </View>
               <View style={s.calGrid}>
-                {Array.from({ length: firstWeekday(calYear, calMonth) }).map((_, i) => (
-                  <View key={`empty-${i}`} style={s.calCell} />
-                ))}
+                {Array.from({ length: firstWeekday(calYear, calMonth) }).map((_, i) => <View key={`e${i}`} style={s.calCell} />)}
                 {Array.from({ length: daysInMonth(calYear, calMonth) }).map((_, i) => {
                   const day = i + 1;
-                  const isSelected = data.date?.year === calYear && data.date?.month === calMonth && data.date?.day === day;
+                  const sel = data.date?.year === calYear && data.date?.month === calMonth && data.date?.day === day;
                   return (
-                    <TouchableOpacity
-                      key={day}
-                      style={s.calCell}
-                      onPress={() => setData(d => ({ ...d, date: { year: calYear, month: calMonth, day } }))}
-                    >
-                      <View style={[s.calDayPill, isSelected && s.calDayPillActive]}>
-                        <Text style={[s.calDayText, isSelected && s.calDayTextActive]}>{day}</Text>
-                      </View>
+                    <TouchableOpacity key={day} style={s.calCell} onPress={() => setData(d => ({ ...d, date: { year: calYear, month: calMonth, day } }))}>
+                      <View style={[s.calDayPill, sel && s.calDayPillActive]}><Text style={[s.calDayText, sel && s.calDayTextActive]}>{day}</Text></View>
                     </TouchableOpacity>
                   );
                 })}
@@ -415,31 +310,23 @@ export default function EventBuilder() {
               <View style={s.hourBox}>
                 <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
                   {Array.from({ length: 24 }, (_, i) => i).map(h => (
-                    <TouchableOpacity
-                      key={h}
-                      style={[s.hourOption, hourPicked && hourVal === h && s.hourOptionActive]}
-                      onPress={() => { setHourVal(h); setHourPicked(true); setData(d => ({ ...d, hour: { h, m: minuteVal } })); }}
-                    >
-                      <Text style={[s.hourOptionText, hourPicked && hourVal === h && s.hourOptionTextActive]}>{String(h).padStart(2, '0')}</Text>
+                    <TouchableOpacity key={h} style={[s.hourOption, hourPicked && hourVal === h && s.hourOptionActive]}
+                      onPress={() => { setHourVal(h); setHourPicked(true); setData(d => ({ ...d, hour: { h, m: minuteVal } })); }}>
+                      <Text style={[s.hourOptionText, hourPicked && hourVal === h && s.hourOptionTextActive]}>{String(h).padStart(2,'0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <Text style={s.hourColon}>:</Text>
                 <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
                   {Array.from({ length: 60 }, (_, i) => i).filter(m => m % 5 === 0).map(m => (
-                    <TouchableOpacity
-                      key={m}
-                      style={[s.hourOption, minutePicked && minuteVal === m && s.hourOptionActive]}
-                      onPress={() => { setMinuteVal(m); setMinutePicked(true); setData(d => ({ ...d, hour: { h: hourVal, m } })); }}
-                    >
-                      <Text style={[s.hourOptionText, minutePicked && minuteVal === m && s.hourOptionTextActive]}>{String(m).padStart(2, '0')}</Text>
+                    <TouchableOpacity key={m} style={[s.hourOption, minutePicked && minuteVal === m && s.hourOptionActive]}
+                      onPress={() => { setMinuteVal(m); setMinutePicked(true); setData(d => ({ ...d, hour: { h: hourVal, m } })); }}>
+                      <Text style={[s.hourOptionText, minutePicked && minuteVal === m && s.hourOptionTextActive]}>{String(m).padStart(2,'0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
-              <View style={s.ampmBadge}>
-                <Text style={s.ampmText}>{hourVal >= 12 ? 'PM' : 'AM'}</Text>
-              </View>
+              <View style={s.ampmBadge}><Text style={s.ampmText}>{hourVal >= 12 ? 'PM' : 'AM'}</Text></View>
             </View>
           </View>
         )}
@@ -448,47 +335,40 @@ export default function EventBuilder() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>Order Summary</Text>
             <View style={s.recallBox}>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Occasion</Text><Text style={s.recallValue}>{data.occasion === 'Other' ? data.occasionOther : (data.occasion || '—')}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Cake Parts</Text><Text style={s.recallValue}>{data.cakeParts || '—'}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Flavour</Text><Text style={s.recallValue}>{data.flavour === 'Other' ? data.flavourOther : (data.flavour || '—')}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Type</Text><Text style={s.recallValue}>{data.cakeType === 'number' ? data.cakeTypeOther : (CAKE_TYPES.find(t => t.id === data.cakeType)?.label || '—')}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Allergies</Text><Text style={s.recallValue}>{data.allergies.length ? data.allergies.join(', ') + (data.allergyOther ? ` (${data.allergyOther})` : '') : 'None'}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Date</Text><Text style={s.recallValue}>{data.date ? `${data.date.day} ${MONTH_NAMES[data.date.month]} ${data.date.year}` : '—'}</Text></View>
-              <View style={s.recallRow}><Text style={s.recallLabel}>Time</Text><Text style={s.recallValue}>{data.hour ? `${String(data.hour.h % 12 === 0 ? 12 : data.hour.h % 12).padStart(2,'0')}:${String(data.hour.m).padStart(2,'0')} ${data.hour.h >= 12 ? 'PM' : 'AM'}` : '—'}</Text></View>
+              <Row l="Occasion" v={data.occasion === 'Other' ? data.occasionOther : (data.occasion || '—')} />
+              <Row l="Cake Parts" v={String(data.cakeParts ?? '—')} />
+              <Row l="Flavour" v={data.flavours.join(', ') || '—'} />
+              <Row l="Decoration" v={data.decorations.join(', ') || '—'} />
+              <Row l="Text" v={data.cakeText.trim() || 'None'} />
+              <Row l="Type" v={CAKE_TYPE_LABELS[data.cakeType ?? ''] || '—'} />
+              <Row l="Allergies" v={allergyDisplay(data.allergies, data.allergyOther)} />
+              <Row l="Date" v={data.date ? `${data.date.day} ${MONTH_NAMES[data.date.month]} ${data.date.year}` : '—'} />
+              <Row l="Time" v={data.hour ? `${String(data.hour.h % 12 === 0 ? 12 : data.hour.h % 12).padStart(2,'0')}:${String(data.hour.m).padStart(2,'0')} ${data.hour.h >= 12 ? 'PM' : 'AM'}` : '—'} />
             </View>
-            <TouchableOpacity
-              style={s.confirmBtn}
-              onPress={() => router.push({ pathname: '/event/checkout', params: { eventData: JSON.stringify(data) } })}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={s.confirmBtnText}>Confirm</Text>
+            <TouchableOpacity style={s.confirmBtn}
+              onPress={() => router.push({ pathname: '/event/quote', params: { cakeData: JSON.stringify(data), editId: editId ?? '' } })}>
+              <Ionicons name="pricetag" size={20} color="#fff" /><Text style={s.confirmBtnText}>Get Quote</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.editBtn} onPress={() => setStepIdx(1)}>
-              <Text style={s.editBtnText}>No, Edit</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={s.editBtn} onPress={() => setStepIdx(1)}><Text style={s.editBtnText}>No, Edit</Text></TouchableOpacity>
           </View>
         )}
 
-        {step !== 'intro' && step !== 'recall' && (
-          <Text style={s.stepIndicator}>Step {stepIdx} of {STEPS.length - 1}</Text>
-        )}
-
+        {step !== 'intro' && step !== 'recall' && <Text style={s.stepIndicator}>Step {stepIdx} of {STEPS.length - 1}</Text>}
       </ScrollView>
 
       {step !== 'intro' && step !== 'recall' && (
         <View style={s.footer}>
-          <TouchableOpacity
-            style={[s.nextBtn, !canGoNext() && s.nextBtnDisabled]}
-            onPress={goNext}
-            disabled={!canGoNext()}
-          >
-            <Text style={s.nextBtnText}>Next</Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          <TouchableOpacity style={[s.nextBtn, !canGoNext() && s.nextBtnDisabled]} onPress={goNext} disabled={!canGoNext()}>
+            <Text style={s.nextBtnText}>Next</Text><Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       )}
     </View>
   );
+}
+
+function Row({ l, v }: { l: string; v: string }) {
+  return <View style={s.recallRow}><Text style={s.recallLabel}>{l}</Text><Text style={s.recallValue}>{v}</Text></View>;
 }
 
 const s = StyleSheet.create({
@@ -507,44 +387,39 @@ const s = StyleSheet.create({
   introStartText:   { fontSize: 18, fontWeight: '800', color: '#fff' },
   section:          { marginTop: 8 },
   sectionTitle:     { fontSize: 19, fontWeight: '800', color: '#1a1612', marginBottom: 16 },
+  faint:            { fontSize: 13, fontWeight: '600', color: '#9a8f8f' },
   optionRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1.5, borderColor: PINK_MID },
-  optionRowActive:  { borderColor: PINK_DARK, backgroundColor: '#fff' },
+  optionRowActive:  { borderColor: PINK_DARK },
   radio:            { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: PINK_MID, alignItems: 'center', justifyContent: 'center' },
   radioActive:      { borderColor: PINK_DARK },
   radioDot:         { width: 12, height: 12, borderRadius: 6, backgroundColor: PINK_DARK },
   optionText:       { fontSize: 15, fontWeight: '600', color: '#1a1612' },
   optionTextActive: { color: PINK_DARK, fontWeight: '800' },
+  checkbox:         { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: PINK_MID, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   specifyRow:       { flexDirection: 'row', gap: 10, marginBottom: 10, marginTop: 4, paddingHorizontal: 4 },
   specifyInput:     { flex: 1, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: PINK_MID, padding: 12, fontSize: 14, color: '#1a1612' },
-  okBtn:            { backgroundColor: PINK_DARK, borderRadius: 10, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
-  okBtnText:        { color: '#fff', fontWeight: '800', fontSize: 14 },
+  okBtn:            { backgroundColor: '#fff', borderWidth: 1.5, borderColor: PINK_DARK, borderRadius: 10, paddingHorizontal: 20, minWidth: 56, alignItems: 'center', justifyContent: 'center' },
+  okBtnDone:        { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  okBtnText:        { color: PINK_DARK, fontWeight: '800', fontSize: 14 },
   partsTopImage:    { alignItems: 'center', marginBottom: 16 },
   partsScrollerFull:{ maxHeight: 280, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID },
   partOption:       { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: PINK_LIGHT },
   partOptionActive: { backgroundColor: PINK_DARK },
   partOptionText:   { fontSize: 16, fontWeight: '700', color: '#1a1612', textAlign: 'center' },
   partOptionTextActive: { color: '#fff' },
-  stepIndicator:    { fontSize: 12, color: '#6b6b6b', textAlign: 'center', marginTop: 24 },
-  footer:           { padding: 20, paddingBottom: 32, borderTopWidth: 1, borderTopColor: PINK_MID, backgroundColor: '#fff' },
-  nextBtn:          { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  nextBtnDisabled:  { opacity: 0.4 },
-  nextBtnText:      { fontSize: 16, fontWeight: '700', color: '#fff' },
-
-  typeGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
-  typeCard:         { width: '30%', aspectRatio: 1, backgroundColor: '#fff', borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: PINK_MID },
-  typeCardActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
-  typeLabel:        { fontSize: 11, fontWeight: '700', color: '#1a1612', textAlign: 'center', paddingHorizontal: 4 },
-  typeLabelActive:  { color: '#fff' },
-  typeSwipeRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
-  typeArrow:        { padding: 8 },
-  typeArrowDisabled:{ opacity: 0.3 },
-  dotsRow:          { flexDirection: 'row', gap: 8 },
-  dot:              { width: 8, height: 8, borderRadius: 4, backgroundColor: PINK_MID },
-  dotActive:        { backgroundColor: PINK_DARK, width: 20 },
-
-  checkbox:         { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: PINK_MID, alignItems: 'center', justifyContent: 'center' },
-  checkboxActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
-
+  fancyPreview:     { fontFamily: 'serif', fontStyle: 'italic', fontSize: 24, color: PINK_DARK, textAlign: 'center', marginBottom: 16 },
+  skipBtn:          { alignItems: 'center', paddingVertical: 12, marginTop: 6 },
+  skipBtnText:      { fontSize: 14, fontWeight: '700', color: '#9a8f8f', textDecorationLine: 'underline' },
+  typeStack:        { gap: 16 },
+  typeBox:          { backgroundColor: '#fff', borderRadius: 16, borderWidth: 2, borderColor: PINK_MID, overflow: 'hidden', alignSelf: 'center', width: SW * 0.6 },
+  typeBoxActive:    { borderColor: PINK_DARK },
+  typeImage:        { width: '100%', height: SW * 0.5 },
+  selectDotWrap:    { position: 'absolute', top: 10, right: 10 },
+  selectDot:        { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, alignItems: 'center', justifyContent: 'center' },
+  selectDotActive:  { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
+  typeLabelBar:     { backgroundColor: PINK_LIGHT, paddingVertical: 10, alignItems: 'center' },
+  typeLabelText:    { fontSize: 15, fontWeight: '800', color: '#1a1612' },
   calCard:          { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: PINK_MID },
   calHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   calMonthLabel:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
@@ -554,7 +429,6 @@ const s = StyleSheet.create({
   calDayPillActive: { backgroundColor: PINK_DARK },
   calDayText:       { fontSize: 14, fontWeight: '600', color: '#1a1612' },
   calDayTextActive: { color: '#fff', fontWeight: '800' },
-
   hourRow:          { flexDirection: 'row', alignItems: 'center', gap: 16 },
   hourBox:          { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 8 },
   hourScroller:     { flex: 1, maxHeight: 200 },
@@ -565,7 +439,6 @@ const s = StyleSheet.create({
   hourColon:        { fontSize: 20, fontWeight: '800', color: '#1a1612' },
   ampmBadge:        { backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16 },
   ampmText:         { fontSize: 16, fontWeight: '900', color: '#fff' },
-
   recallBox:        { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1.5, borderColor: PINK_MID, marginBottom: 20 },
   recallRow:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   recallLabel:      { fontSize: 13, color: '#6b6b6b', fontWeight: '600' },
@@ -574,4 +447,9 @@ const s = StyleSheet.create({
   confirmBtnText:   { fontSize: 16, fontWeight: '800', color: '#fff' },
   editBtn:          { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 2.5, borderColor: PINK_DARK, backgroundColor: '#fff' },
   editBtnText:      { fontSize: 14, fontWeight: '800', color: PINK_DARK },
+  stepIndicator:    { fontSize: 12, color: '#6b6b6b', textAlign: 'center', marginTop: 24 },
+  footer:           { padding: 20, paddingBottom: 32, borderTopWidth: 1, borderTopColor: PINK_MID, backgroundColor: '#fff' },
+  nextBtn:          { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  nextBtnDisabled:  { opacity: 0.4 },
+  nextBtnText:      { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

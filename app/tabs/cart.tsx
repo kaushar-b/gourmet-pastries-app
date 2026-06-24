@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../../context/CartContext';
+import { allergyDisplay, CAKE_TYPE_LABELS } from '../../constants/eventPricing';
 
 const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
@@ -10,11 +11,6 @@ const PINK_MID   = '#E9ABAE';
 const VAT_RATE   = 0.14;
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const TYPE_LABELS: Record<string, string> = {
-  round: 'Round', tall_round: 'Tall Round', tall_flat: 'Tall Flat', square_flat: 'Square Flat',
-  tiered: 'Tiered', sheet: 'Sheet Cake', heart: 'Heart Shaped', number: 'Number/Alphabet',
-  cupcake_tower: 'Cupcake Tower', sculpted: 'Sculpted',
-};
 
 function fmtDate(d: any) {
   if (!d) return '—';
@@ -120,9 +116,11 @@ export default function Cart() {
                     <View style={s.summaryBox}>
                       <SumRow label="Occasion" value={cake.occasion === 'Other' ? cake.occasionOther : (cake.occasion || '—')} />
                       <SumRow label="Cake Parts" value={String(cake.cakeParts ?? '—')} />
-                      <SumRow label="Flavour" value={cake.flavour === 'Other' ? cake.flavourOther : (cake.flavour || '—')} />
-                      <SumRow label="Type" value={cake.cakeType === 'number' ? cake.cakeTypeOther : (TYPE_LABELS[cake.cakeType] || '—')} />
-                      <SumRow label="Allergies" value={cake.allergies?.length ? cake.allergies.join(', ') + (cake.allergyOther ? ` (${cake.allergyOther})` : '') : 'None'} />
+                      <SumRow label="Flavour" value={(cake.flavours || []).join(', ') || '—'} />
+                      <SumRow label="Decoration" value={(cake.decorations || []).join(', ') || '—'} />
+                      <SumRow label="Text" value={cake.cakeText?.trim() || 'None'} />
+                      <SumRow label="Type" value={CAKE_TYPE_LABELS[cake.cakeType] || '—'} />
+                      <SumRow label="Allergies" value={allergyDisplay(cake.allergies, cake.allergyOther)} />
                       <SumRow label="Date" value={fmtDate(cake.date)} />
                       <SumRow label="Time" value={fmtHour(cake.hour)} />
                       <SumRow label="Fulfilment" value={cake.orderType === 'delivery' ? 'Delivery' : 'Pickup'} />

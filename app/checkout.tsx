@@ -3,15 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../context/CartContext';
-import { ref, set, push } from 'firebase/database';
+import { ref, set, push, get } from 'firebase/database';
 import { db, auth } from '../lib/firebase';
 import { sendPushNotification, CHANNELS } from '../lib/notifications';
-import { get } from 'firebase/database';
+import { VAT_RATE } from '../constants/eventPricing';
 
 const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
-const VAT_RATE   = 0.14;
 
 export default function Checkout() {
   const router = useRouter();
@@ -28,15 +27,12 @@ export default function Checkout() {
   const [placing, setPlacing]         = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
-  const menuFull      = items.filter(i => !i.cakeOrder).reduce((sm, i) => sm + i.price * i.quantity, 0);
-  const cakeFull      = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.total ?? 0), 0);
-  const cakeDeposit   = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.deposit ?? 0), 0);
-  const cakeRemaining = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.remaining ?? 0), 0);
-  const cakeTips      = items.filter(i => i.cakeOrder).reduce((sm, i) => sm + (i.cakeOrder?.tip ?? 0), 0);
-  const subtotal   = menuFull + cakeFull;
-  const vatAmount  = Math.round(subtotal * VAT_RATE);
-  const total      = subtotal; // keep name used elsewhere
-  const grandTotal = menuFull + cakeDeposit + vatAmount + tip + cakeTips;
+  const cakeFull      = items.reduce((sm, i) => sm + (i.cakeOrder?.total ?? 0), 0);
+  const cakeDeposit   = Math.round(cakeFull * 0.5);
+  const cakeRemaining = cakeFull - cakeDeposit;
+  const vatAmount     = Math.round(cakeFull * VAT_RATE);
+  const totalInclVat  = cakeFull + vatAmount;
+  const grandTotal    = cakeDeposit + vatAmount + tip;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -57,6 +53,16 @@ export default function Checkout() {
       const user = auth.currentUser;
       const customerToken = user ? (await get(ref(db, `userTokens/${user.uid}`))).val() : null;
 
+      const enrichedItems = items.map(i => {
+        if (!i.cakeOrder) return { name: i.name, price: i.price, quantity: i.quantity, cakeOrder: null };
+        const t = i.cakeOrder.total ?? 0;
+        const dep = Math.round(t * 0.5);
+        return {
+          name: i.name, price: i.price, quantity: i.quantity,
+          cakeOrder: { ...i.cakeOrder, total: t, deposit: dep, remaining: t - dep, orderType, tip },
+        };
+      });
+
       const orderData = {
         name: name.trim(),
         phone: '+267' + phone.trim(),
@@ -65,16 +71,15 @@ export default function Checkout() {
         address2: address2.trim(),
         paymentMethod,
         tip,
-        items: items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, cakeOrder: i.cakeOrder ?? null })),
-        subtotal,
+        items: enrichedItems,
+        subtotal: cakeFull,
         total: grandTotal,
         vatAmount,
         cakeRemaining,
         amountPaid: grandTotal,
-        status: 'pending',
+        status: 'received',
         assignedToDriver: false,
         driverStatus: null,
-        preparingStatus: null,
         paid: false,
         userId: user?.uid ?? null,
         customerPushToken: customerToken,
@@ -85,7 +90,6 @@ export default function Checkout() {
       const newOrderRef = push(ref(db, 'orders'));
       await set(newOrderRef, orderData);
 
-      // Notify manager
       const managerSnap = await get(ref(db, 'staffTokens/manager'));
       if (managerSnap.val()) {
         await sendPushNotification(managerSnap.val(), 'New Order!', `Order from ${name.trim()}`, CHANNELS.MANAGER);
@@ -112,8 +116,8 @@ export default function Checkout() {
         <View style={s.empty}>
           <Ionicons name="cart-outline" size={64} color={PINK_MID} />
           <Text style={s.emptyText}>Your cart is empty</Text>
-          <TouchableOpacity style={s.shopBtn} onPress={() => router.push('/menu/menu')}>
-            <Text style={s.shopBtnText}>Browse Menu</Text>
+          <TouchableOpacity style={s.shopBtn} onPress={() => router.push('/event/event')}>
+            <Text style={s.shopBtnText}>Build a Cake</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -126,7 +130,7 @@ export default function Checkout() {
         <View style={s.confirmBox}>
           <Ionicons name="checkmark-circle" size={72} color={PINK_DARK} />
           <Text style={s.confirmTitle}>Order Placed!</Text>
-          <Text style={s.confirmSub}>We've received your order and will start preparing it shortly.</Text>
+          <Text style={s.confirmSub}>We've received your order and your 50% deposit. We'll start preparing it shortly.</Text>
           <TouchableOpacity style={s.confirmBtn} onPress={() => router.replace('/tabs')}>
             <Text style={s.confirmBtnText}>Back to Home</Text>
           </TouchableOpacity>
@@ -151,7 +155,11 @@ export default function Checkout() {
 
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }}>
 
-          {/* Order type */}
+          <View style={s.depositNote}>
+            <Ionicons name="information-circle" size={20} color={PINK_DARK} />
+            <Text style={s.depositNoteText}>50% Down Payment required to confirm your order</Text>
+          </View>
+
           <Text style={s.sectionLabel}>How would you like your order?</Text>
           {errors.orderType ? <Text style={s.errTxt}>{errors.orderType}</Text> : null}
           <View style={s.toggleRow}>
@@ -165,7 +173,6 @@ export default function Checkout() {
             </TouchableOpacity>
           </View>
 
-          {/* Delivery fields */}
           {orderType === 'delivery' && (
             <>
               <Text style={s.sectionLabel}>Payment Method</Text>
@@ -197,7 +204,6 @@ export default function Checkout() {
             </>
           )}
 
-          {/* Contact */}
           <Text style={s.sectionLabel}>Contact Details</Text>
           {errors.name ? <Text style={s.errTxt}>{errors.name}</Text> : null}
           <TextInput style={s.input} placeholder="Full name" placeholderTextColor="#b58a8d" value={name} onChangeText={setName} />
@@ -207,21 +213,21 @@ export default function Checkout() {
             <TextInput style={s.phoneInput} placeholder="71234567" placeholderTextColor="#b58a8d" value={phone} onChangeText={t => setPhone(t.replace(/[^0-9]/g, '').slice(0, 8))} keyboardType="number-pad" maxLength={8} />
           </View>
 
-          {/* Order summary */}
-          <Text style={s.sectionLabel}>Order Summary</Text>
+          <Text style={s.sectionLabel}>Payment Summary</Text>
           <View style={s.summaryBox}>
             {items.map(item => (
               <View key={item.id} style={s.summaryRow}>
-                <Text style={s.summaryItem}>{item.quantity}× {item.name}</Text>
-                <Text style={s.summaryPrice}>P {item.price * item.quantity}.00</Text>
+                <Text style={s.summaryItem}>{item.name}</Text>
+                <Text style={s.summaryPrice}>P {item.cakeOrder?.total ?? item.price}.00</Text>
               </View>
             ))}
             <View style={s.summaryDivider} />
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Subtotal</Text><Text style={s.summaryPrice}>P {total}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>VAT (14%)</Text><Text style={s.summaryPrice}>P {vatAmount}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {cakeFull}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Including VAT</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining (on collection)</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>
             {tip > 0 && <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tip}.00</Text></View>}
             <View style={s.summaryDivider} />
-            <View style={s.summaryRow}><Text style={s.grandLabel}>Total</Text><Text style={s.grandVal}>P {grandTotal}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.grandLabel}>50% + Full VAT</Text><Text style={s.grandVal}>P {grandTotal}.00</Text></View>
           </View>
 
         </ScrollView>
@@ -242,6 +248,8 @@ const s = StyleSheet.create({
   header:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: PINK_LIGHT },
   backBtn:         { width: 40, height: 40, borderRadius: 20, backgroundColor: PINK_LIGHT, alignItems: 'center', justifyContent: 'center' },
   title:           { fontSize: 22, fontWeight: '800', color: '#1a1612' },
+  depositNote:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: PINK_LIGHT, borderRadius: 14, padding: 14, marginBottom: 8 },
+  depositNoteText: { fontSize: 13, fontWeight: '700', color: '#1a1612', flex: 1 },
   sectionLabel:    { fontSize: 15, fontWeight: '700', color: '#1a1612', marginBottom: 8, marginTop: 16 },
   errTxt:          { fontSize: 12, color: '#C65C69', marginBottom: 6 },
   toggleRow:       { flexDirection: 'row', gap: 12, marginBottom: 8 },
