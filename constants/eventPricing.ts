@@ -17,12 +17,12 @@ export const OCCASIONS = ['Birthday', 'Party', 'Wedding', 'Corporate', 'Other'];
 export const ALLERGY_OPTIONS = ['Gluten', 'Almond', 'Peanuts', 'Dairy', 'Eggs', 'Soy', 'Other', 'None'];
 
 export const CAKE_TYPES = [
-  { id: 'round',    label: 'Round',    image: require('../assets/cake-round.png') },
-  { id: 'square',   label: 'Square',   image: require('../assets/cake-square.png') },
-  { id: 'two_tier', label: 'Two-Tier', image: require('../assets/cake-two-tier.png') },
+  { id: 'round',    label: 'Round Cake',    image: require('../assets/cake-round.png') },
+  { id: 'square',   label: 'Sheet Cake',    image: require('../assets/cake-square.png') },
+  { id: 'two_tier', label: 'Two-Tier Cake', image: require('../assets/cake-two-tier.png') },
 ];
 export const CAKE_TYPE_LABELS: Record<string, string> = {
-  round: 'Round', square: 'Square', two_tier: 'Two-Tier',
+  round: 'Round Cake', square: 'Sheet Cake', two_tier: 'Two-Tier Cake',
 };
 
 // Number of parts: 4..50 stepping by 4 (4,8,...,48) plus 50
