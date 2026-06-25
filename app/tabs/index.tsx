@@ -27,9 +27,9 @@ const CAROUSEL_ITEMS = [
 // To change a slide image: overwrite the file in assets/slideshow/ (keep the name).
 // To change a slide's caption: edit the `text` below.
 const SLIDESHOW_ITEMS = [
-  { id: 's1', text: 'Custom Birthday Cakes',     image: require('../../assets/slideshow/slide1.jpeg') },
-  { id: 's2', text: 'Fresh Daily Pastries',      image: require('../../assets/slideshow/slide2.jpeg') },
-  { id: 's3', text: 'Wedding Cake Specialists',  image: require('../../assets/slideshow/slide3.jpeg') },
+  { id: 's1', text: 'Strawberry Cream Cake',     image: require('../../assets/slideshow/slide1.jpeg') },
+  { id: 's2', text: 'Birthday Cakes',      image: require('../../assets/slideshow/slide2.jpeg') },
+  { id: 's3', text: 'Wedding Cakes',  image: require('../../assets/slideshow/slide3.jpeg') },
 ];
 
 function PlaceholderTile({ icon, size }: { icon: keyof typeof Ionicons.glyphMap; size: number }) {
