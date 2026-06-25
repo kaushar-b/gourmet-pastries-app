@@ -23,10 +23,13 @@ const CAROUSEL_ITEMS = [
   { id: 'c6', label: 'Tarts', icon: 'pie-chart-outline' as const },
 ];
 
+// ── HOME SLIDESHOW ──
+// To change a slide image: overwrite the file in assets/slideshow/ (keep the name).
+// To change a slide's caption: edit the `text` below.
 const SLIDESHOW_ITEMS = [
-  { id: 's1', label: 'Custom Birthday Cakes', icon: 'sparkles-outline' as const },
-  { id: 's2', label: 'Fresh Daily Pastries', icon: 'restaurant-outline' as const },
-  { id: 's3', label: 'Wedding Cake Specialists', icon: 'rose-outline' as const },
+  { id: 's1', text: 'Custom Birthday Cakes',     image: require('../../assets/slideshow/slide1.jpeg') },
+  { id: 's2', text: 'Fresh Daily Pastries',      image: require('../../assets/slideshow/slide2.jpeg') },
+  { id: 's3', text: 'Wedding Cake Specialists',  image: require('../../assets/slideshow/slide3.jpeg') },
 ];
 
 function PlaceholderTile({ icon, size }: { icon: keyof typeof Ionicons.glyphMap; size: number }) {
@@ -137,8 +140,8 @@ export default function Home() {
         {/* Big single-image slideshow */}
         <View style={styles.sectionWrap}>
           <TouchableOpacity style={styles.slideshowWrap} activeOpacity={0.9}>
-            <PlaceholderTile icon={SLIDESHOW_ITEMS[slideIdx].icon} size={SW - 32} />
-            <Text style={styles.slideshowLabel}>{SLIDESHOW_ITEMS[slideIdx].label}</Text>
+            <Image source={SLIDESHOW_ITEMS[slideIdx].image} style={{ width: '100%', height: (SW - 32) * 0.62 }} resizeMode="cover" />
+            <Text style={styles.slideshowLabel}>{SLIDESHOW_ITEMS[slideIdx].text}</Text>
           </TouchableOpacity>
         </View>
 
@@ -148,13 +151,13 @@ export default function Home() {
             <Ionicons name="location" size={18} color={PINK_DARK} />
             <Text style={styles.infoTitle}>Location</Text>
           </View>
-          <Text style={styles.infoText}>Set your shop address here</Text>
+          <Text style={styles.infoText}>Mowana Park Mall, Phakalane</Text>
           <View style={styles.infoDivider} />
           <View style={styles.infoRow}>
             <Ionicons name="time" size={18} color={PINK_DARK} />
             <Text style={styles.infoTitle}>Hours</Text>
           </View>
-          <Text style={styles.infoText}>Set your opening hours here</Text>
+          <Text style={styles.infoText}>Mon–Sun: 7:00 AM – 10:00 PM</Text>
         </View>
 
         <View style={{ height: 30 }} />

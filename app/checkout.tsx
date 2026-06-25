@@ -37,7 +37,6 @@ export default function Checkout() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!orderType) e.orderType = 'Please select Pickup or Delivery';
-    if (orderType === 'delivery' && !paymentMethod) e.paymentMethod = 'Please select a payment method';
     if (!name.trim()) e.name = 'Full name is required';
     if (!phone.trim()) e.phone = 'Phone number is required';
     if (phone.trim().length !== 8) e.phone = 'Phone number must be 8 digits';
@@ -175,19 +174,6 @@ export default function Checkout() {
 
           {orderType === 'delivery' && (
             <>
-              <Text style={s.sectionLabel}>Payment Method</Text>
-              {errors.paymentMethod ? <Text style={s.errTxt}>{errors.paymentMethod}</Text> : null}
-              <View style={s.toggleRow}>
-                <TouchableOpacity style={[s.toggleBtn, paymentMethod === 'online' && s.toggleActive]} onPress={() => setPaymentMethod('online')}>
-                  <Ionicons name="card" size={22} color={paymentMethod === 'online' ? '#fff' : PINK_DARK} />
-                  <Text style={[s.toggleTitle, paymentMethod === 'online' && s.toggleTitleActive]}>Pay Online</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.toggleBtn, paymentMethod === 'cod' && s.toggleActive]} onPress={() => setPaymentMethod('cod')}>
-                  <Ionicons name="cash" size={22} color={paymentMethod === 'cod' ? '#fff' : PINK_DARK} />
-                  <Text style={[s.toggleTitle, paymentMethod === 'cod' && s.toggleTitleActive]}>Pay on Delivery</Text>
-                </TouchableOpacity>
-              </View>
-
               <Text style={s.sectionLabel}>Driver Tip</Text>
               <View style={s.tipRow}>
                 {[0, 5, 10, 20].map(amt => (
@@ -223,7 +209,7 @@ export default function Checkout() {
             ))}
             <View style={s.summaryDivider} />
             <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {cakeFull}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Including VAT</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Including VAT (14%)</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
             <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining (on collection)</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>
             {tip > 0 && <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tip}.00</Text></View>}
             <View style={s.summaryDivider} />

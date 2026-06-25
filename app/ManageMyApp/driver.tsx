@@ -58,18 +58,21 @@ function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'compl
   const notify = (title: string, body: string) => {
     if (order.customerPushToken) sendPushNotification(order.customerPushToken, title, body, CHANNELS.CUSTOMER);
   };
-  const markPickedUp = () => Alert.alert('Confirm', 'Mark as picked up from shop?', [
+  const markOnTheWay = async () => {
+    await update(ref(db, `orders/${order.id}`), { driverStatus: 'on_the_way' });
+    notify('On the Way!', 'Your order is on its way to you!');
+  };
+  const markDelivered = async () => {
+    await update(ref(db, `orders/${order.id}`), { driverStatus: 'delivered' });
+    notify('Order Delivered!', 'Your order has been delivered. Enjoy!');
+  };
+  const markPaidConfirm = () => Alert.alert('Confirm Payment', 'Has this order been paid?', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Yes', onPress: async () => { await update(ref(db, `orders/${order.id}`), { driverStatus: 'picked_up' }); notify('Order Picked Up', 'Your order is on the way!'); }},
+    { text: 'OK', onPress: async () => { await update(ref(db, `orders/${order.id}`), { paid: true }); notify('Payment Confirmed', 'Your balance is marked as paid. Thank you!'); }},
   ]);
-  const markOnTheWay = () => Alert.alert('Confirm', 'Mark as on the way?', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Yes', onPress: async () => { await update(ref(db, `orders/${order.id}`), { driverStatus: 'on_the_way' }); notify('On the Way!', 'Your order is on its way to you!'); }},
-  ]);
-  const markDelivered = () => Alert.alert('Confirm', 'Mark as delivered?', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Yes', onPress: async () => { await update(ref(db, `orders/${order.id}`), { driverStatus: 'delivered', status: 'completed' }); notify('Delivered!', 'Your order has been delivered. Enjoy!'); }},
-  ]);
+  const markOrderCompleted = async () => {
+    await update(ref(db, `orders/${order.id}`), { status: 'completed' });
+  };
 
   return (
     <View style={s.card}>
@@ -105,16 +108,50 @@ function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'compl
         </View>
       )}
 
-      {tab === 'live' && (
-        <View style={s.actionCol}>
-          {!order.paid && remaining > 0 && (
-            <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#22c55e' }]} onPress={onPaid}><Text style={s.actionBtnTxt}>Mark Balance Paid</Text></TouchableOpacity>
-          )}
-          {!order.driverStatus && <TouchableOpacity style={s.actionBtn} onPress={markPickedUp}><Text style={s.actionBtnTxt}>Picked Up</Text></TouchableOpacity>}
-          {order.driverStatus === 'picked_up' && <TouchableOpacity style={s.actionBtn} onPress={markOnTheWay}><Text style={s.actionBtnTxt}>On the Way</Text></TouchableOpacity>}
-          {order.driverStatus === 'on_the_way' && <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#22c55e' }]} onPress={markDelivered}><Text style={s.actionBtnTxt}>Delivered</Text></TouchableOpacity>}
-        </View>
-      )}
+      {tab === 'live' && (() => {
+        const delivered = order.driverStatus === 'delivered';
+        const isPaid = order.paid || remaining <= 0;
+        if (delivered && isPaid) {
+          return (
+            <View style={s.actionCol}>
+              <TouchableOpacity style={s.completeBtn} onPress={markOrderCompleted}>
+                <Text style={s.completeBtnTxt}>Order Completed</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+        return (
+          <View style={s.actionRow}>
+            {/* Paid button — disabled until delivered */}
+            <TouchableOpacity
+              style={[s.pillBtn, isPaid ? s.pillPaid : (!delivered && s.pillDisabled)]}
+              disabled={!delivered || isPaid}
+              onPress={markPaidConfirm}
+            >
+              {isPaid
+                ? <Text style={s.pillPaidTxt}>✓ Paid</Text>
+                : <Text style={s.pillTxt}>Paid</Text>}
+            </TouchableOpacity>
+
+            {/* Status button: On the Way! -> Delivered */}
+            {order.driverStatus !== 'on_the_way' && !delivered && (
+              <TouchableOpacity style={s.pillBtn} onPress={markOnTheWay}>
+                <Text style={s.pillTxt}>On the Way!</Text>
+              </TouchableOpacity>
+            )}
+            {order.driverStatus === 'on_the_way' && (
+              <TouchableOpacity style={s.pillBtnBlue} onPress={markDelivered}>
+                <Text style={s.pillTxtBlue}>Delivered</Text>
+              </TouchableOpacity>
+            )}
+            {delivered && (
+              <View style={s.pillBtnBlueFilled}>
+                <Text style={s.pillTxtWhite}>✓ Delivered</Text>
+              </View>
+            )}
+          </View>
+        );
+      })()}
     </View>
   );
 }
@@ -150,8 +187,8 @@ export default function DriverDashboard() {
     if (order.customerPushToken) sendPushNotification(order.customerPushToken, 'Payment Confirmed', 'Your remaining balance is marked as paid. Thank you!', CHANNELS.CUSTOMER);
   };
 
-  const liveOrders      = orders.filter(o => o.driverStatus !== 'delivered');
-  const completedOrders = orders.filter(o => o.driverStatus === 'delivered');
+  const liveOrders      = orders.filter(o => o.status !== 'completed');
+  const completedOrders = orders.filter(o => o.status === 'completed');
   const shown = tab === 'live' ? liveOrders : completedOrders;
 
   return (
@@ -205,7 +242,7 @@ const s = StyleSheet.create({
   typeBadgeText:    { fontSize: 10, fontWeight: '900', color: PINK_DARK },
   cardName:         { fontSize: 16, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   totalTxt:         { fontSize: 15, fontWeight: '800', color: PINK_DARK, marginTop: 4 },
-  balanceTxt:       { fontSize: 13, fontWeight: '800', color: '#C65C69', marginTop: 6 },
+  balanceTxt:       { fontSize: 13, fontWeight: '800', color: '#dc2626', marginTop: 6 },
   paidBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   paidBadgeText:    { fontSize: 13, fontWeight: '800', color: '#22c55e' },
   dropToggle:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: PINK_LIGHT },
@@ -224,4 +261,16 @@ const s = StyleSheet.create({
   actionCol:        { gap: 8, marginTop: 12 },
   actionBtn:        { backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   actionBtnTxt:     { fontSize: 14, fontWeight: '800', color: '#fff' },
+  actionRow:        { flexDirection: 'row', gap: 10, marginTop: 12 },
+  pillBtn:          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: '#CE6F79' },
+  pillTxt:          { fontSize: 14, fontWeight: '800', color: '#CE6F79' },
+  pillDisabled:     { opacity: 0.35 },
+  pillPaid:         { backgroundColor: '#22c55e', borderColor: '#22c55e' },
+  pillPaidTxt:      { fontSize: 14, fontWeight: '800', color: '#fff' },
+  pillBtnBlue:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: '#3b82f6' },
+  pillTxtBlue:      { fontSize: 14, fontWeight: '800', color: '#3b82f6' },
+  pillBtnBlueFilled:{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#3b82f6' },
+  pillTxtWhite:     { fontSize: 14, fontWeight: '800', color: '#fff' },
+  completeBtn:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: '#3b82f6' },
+  completeBtnTxt:   { fontSize: 15, fontWeight: '900', color: '#3b82f6' },
 });

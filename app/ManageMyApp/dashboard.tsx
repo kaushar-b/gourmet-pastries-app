@@ -69,13 +69,17 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
   };
   const markReadyPickup = async () => {
     await update(ref(db, `orders/${order.id}`), { status: 'ready' });
-    notifyCustomer('Order Ready', 'Your order is ready for pickup!');
+    notifyCustomer('Order is Ready for Pickup!', 'Your order is ready for pickup!');
   };
-  const assignDriver = async () => {
-    const driverSnap = await get(ref(db, 'staffTokens/driver'));
-    await update(ref(db, `orders/${order.id}`), { assignedToDriver: true, driverStatus: null });
-    if (driverSnap.val()) sendPushNotification(driverSnap.val(), 'New Delivery', `New order for ${order.name}`, CHANNELS.DRIVER);
-    notifyCustomer('Order Update', 'Your order has been assigned to a driver!');
+  const assignDriver = () => {
+    Alert.alert('Assign to Driver', 'Are you sure you want to assign this order to the driver?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'OK', onPress: async () => {
+        const driverSnap = await get(ref(db, 'staffTokens/driver'));
+        await update(ref(db, `orders/${order.id}`), { assignedToDriver: true, driverStatus: null });
+        if (driverSnap.val()) sendPushNotification(driverSnap.val(), 'New Delivery', `New order for ${order.name}`, CHANNELS.DRIVER);
+      }},
+    ]);
   };
   const markPaid = async () => {
     await update(ref(db, `orders/${order.id}`), { paid: true });
@@ -86,7 +90,7 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
       { text: 'Cancel', style: 'cancel' },
       { text: 'Yes', onPress: async () => {
         await update(ref(db, `orders/${order.id}`), { status: 'completed' });
-        notifyCustomer('Order Complete', 'Thank you! Enjoy!');
+        notifyCustomer('Order Picked Up!', 'Thank you! Enjoy!');
       }},
     ]);
   };
@@ -146,17 +150,19 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
       {/* Actions */}
       {role === 'live' && (
         <View style={c.actionRow}>
-          <TouchableOpacity style={c.actionBtn} onPress={markPreparing}><Text style={c.actionBtnTxt}>Preparing</Text></TouchableOpacity>
+          <TouchableOpacity style={[c.actionBtn, order.status === 'preparing' && c.actionBtnActive]} onPress={markPreparing}>
+            <Text style={[c.actionBtnTxt, order.status === 'preparing' && c.actionBtnTxtActive]}>Preparing</Text>
+          </TouchableOpacity>
           {order.orderType === 'pickup'
-            ? <TouchableOpacity style={[c.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={markReadyPickup}><Text style={c.actionBtnTxt}>Ready for Pickup</Text></TouchableOpacity>
-            : <TouchableOpacity style={[c.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>}
+            ? <TouchableOpacity style={c.actionBtn} onPress={markReadyPickup}><Text style={c.actionBtnTxt}>Ready for Pickup</Text></TouchableOpacity>
+            : <TouchableOpacity style={c.actionBtn} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>}
         </View>
       )}
 
       {role === 'ready' && (
         <View style={c.actionRow}>
           {!order.paid && remaining > 0 ? (
-            <TouchableOpacity style={[c.actionBtn, { backgroundColor: '#22c55e' }]} onPress={markPaid}><Text style={c.actionBtnTxt}>Paid</Text></TouchableOpacity>
+            <TouchableOpacity style={c.actionBtn} onPress={markPaid}><Text style={c.actionBtnTxt}>Paid</Text></TouchableOpacity>
           ) : null}
           <TouchableOpacity
             style={[c.actionBtn, (!order.paid && remaining > 0) && c.actionBtnDisabled]}
@@ -168,12 +174,9 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
 
       {role === 'driver' && (
         <View style={c.actionRow}>
-          {!order.paid && remaining > 0 && (
-            <TouchableOpacity style={[c.actionBtn, { backgroundColor: '#22c55e' }]} onPress={markPaid}><Text style={c.actionBtnTxt}>Paid</Text></TouchableOpacity>
-          )}
           <View style={[c.sentNote, { flex: 1 }]}>
             <Ionicons name="car-outline" size={15} color="#3b82f6" />
-            <Text style={c.sentNoteTxt}>{order.driverStatus === 'on_the_way' ? 'On the way' : order.driverStatus === 'picked_up' ? 'Picked up' : 'With driver'}</Text>
+            <Text style={c.sentNoteTxt}>{order.driverStatus === 'on_the_way' ? 'On the way' : order.driverStatus === 'delivered' ? 'Delivered' : 'With driver'}</Text>
           </View>
         </View>
       )}
@@ -286,7 +289,7 @@ const c = StyleSheet.create({
   typeBadgeText:{ fontSize: 10, fontWeight: '900', color: PINK_DARK },
   cardName:     { fontSize: 16, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   totalTxt:     { fontSize: 15, fontWeight: '800', color: PINK_DARK, marginTop: 4 },
-  balanceTxt:   { fontSize: 13, fontWeight: '800', color: '#C65C69', marginTop: 6 },
+  balanceTxt:   { fontSize: 13, fontWeight: '800', color: '#dc2626', marginTop: 6 },
   paidBadge:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   paidBadgeText:{ fontSize: 13, fontWeight: '800', color: '#22c55e' },
   dropToggle:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: PINK_LIGHT },
@@ -303,9 +306,11 @@ const c = StyleSheet.create({
   sumLabel:     { fontSize: 12, color: '#6b6b6b', fontWeight: '600' },
   sumValue:     { fontSize: 12, color: '#1a1612', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 12 },
   actionRow:    { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  actionBtn:    { flex: 1, minWidth: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 12 },
+  actionBtn:    { flex: 1, minWidth: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_DARK, borderRadius: 12, paddingVertical: 12 },
+  actionBtnActive: { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   actionBtnDisabled: { opacity: 0.4 },
-  actionBtnTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  actionBtnTxt: { fontSize: 13, fontWeight: '800', color: PINK_DARK },
+  actionBtnTxtActive: { fontSize: 13, fontWeight: '800', color: '#fff' },
   sentNote:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#eff6ff', borderRadius: 10, padding: 10 },
   sentNoteTxt:  { fontSize: 12, color: '#1d4ed8', flex: 1 },
   deleteBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#6b6b6b' },

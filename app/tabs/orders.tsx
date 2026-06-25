@@ -29,12 +29,10 @@ type Order = {
 
 function statusLabel(o: Order): { label: string; color: string; icon: string } {
   if (o.status === 'completed' || o.driverStatus === 'delivered') return { label: 'Completed', color: '#22c55e', icon: 'checkmark-circle' };
-  if (o.driverStatus === 'on_the_way') return { label: 'On the Way', color: '#3b82f6', icon: 'car' };
-  if (o.driverStatus === 'picked_up') return { label: 'With Driver', color: '#8b5cf6', icon: 'bicycle' };
-  if (o.assignedToDriver) return { label: 'Assigned to Driver', color: '#8b5cf6', icon: 'bicycle' } as any;
-  if (o.status === 'ready') return { label: 'Ready for Pickup', color: '#f59e0b', icon: 'storefront' };
-  if (o.status === 'preparing') return { label: 'Preparing', color: '#f97316', icon: 'restaurant' };
-  return { label: 'Received', color: PINK_DARK, icon: 'receipt' };
+  if (o.driverStatus === 'on_the_way') return { label: 'On the Way!', color: '#3b82f6', icon: 'car' };
+  if (o.status === 'ready') return { label: 'Ready to Pickup', color: '#22c55e', icon: 'storefront' };
+  if (o.status === 'preparing') return { label: 'Preparing', color: '#f59e0b', icon: 'restaurant' };
+  return { label: 'Pending', color: '#9a8f8f', icon: 'time' };
 }
 
 function CakeBlock({ cake }: { cake: any }) {
@@ -83,7 +81,7 @@ function OrderRow({ order }: { order: Order }) {
       {/* Collapsed: remaining balance (red) or paid (green) */}
       {remaining > 0 && (
         order.paid ? (
-          <View style={[s.balancePill, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
+          <View style={[s.balancePill, s.balancePillNarrow, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
             <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
             <Text style={[s.balanceText, { color: '#22c55e' }]}>Paid</Text>
           </View>
@@ -214,4 +212,5 @@ const s = StyleSheet.create({
   totalVal:     { fontSize: 13, fontWeight: '700', color: '#1a1612' },
   balancePill:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
   balanceText:  { fontSize: 14, fontWeight: '800' },
+  balancePillNarrow: { alignSelf: 'flex-start' },
 });

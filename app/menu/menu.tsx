@@ -135,7 +135,7 @@ const s = StyleSheet.create({
   search:       { flex: 1, paddingVertical: 12, fontSize: 15, color: '#1a1612' },
   list:         { paddingHorizontal: 16, paddingTop: 14 },
   card:         { backgroundColor: '#fff', borderRadius: 18, marginBottom: 20, overflow: 'hidden', elevation: 2 },
-  cardImgWrap:  { width: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: PINK_LIGHT },
+  cardImgWrap:  { width: '100%', height: 180, backgroundColor: PINK_LIGHT },
   cardBody:     { padding: 16 },
   cardName:     { fontSize: 17, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   cardDesc:     { fontSize: 13, color: '#6b6b6b', lineHeight: 19, marginBottom: 8 },

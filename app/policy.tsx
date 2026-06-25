@@ -62,20 +62,10 @@ export default function PrivacyPolicy() {
         <Text style={s.heading}>6. Push Notifications</Text>
         <Text style={s.body}>The App requests permission to send you push notifications. These notifications are used exclusively for order updates (e.g. "Order Received", "Being Prepared", "Ready for Pickup", "Delivered"). You can disable push notifications at any time through your device's notification settings. Disabling notifications will not affect your ability to place orders.</Text>
 
-        <Text style={s.heading}>7. Your Rights</Text>
-        <Text style={s.body}>You have the right to:</Text>
-        <Text style={s.bullet}>• Request access to the personal data we hold about you</Text>
-        <Text style={s.bullet}>• Request correction or deletion of your personal data</Text>
-        <Text style={s.bullet}>• Withdraw consent to data processing at any time</Text>
-        <Text style={s.body}>To exercise any of these rights, please contact us using the details below.</Text>
-
-        <Text style={s.heading}>8. Children's Privacy</Text>
-        <Text style={s.body}>Our App is not directed at children under the age of 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us and we will delete it promptly.</Text>
-
-        <Text style={s.heading}>9. Changes to This Policy</Text>
+        <Text style={s.heading}>7. Changes to This Policy</Text>
         <Text style={s.body}>We may update this Privacy Policy from time to time. Any changes will be reflected in the "Last updated" date above. Continued use of the App after changes are posted constitutes your acceptance of the updated policy.</Text>
 
-        <Text style={s.heading}>10. Contact Us</Text>
+        <Text style={s.heading}>8. Contact Us</Text>
         <Text style={s.body}>If you have any questions about this Privacy Policy or how we handle your data, please contact us:</Text>
         <Text style={s.bullet}>• Email: gourmetpastries.bw@gmail.com</Text>
         <Text style={s.bullet}>• Location: Mowana Park Mall, Phakalane, Botswana</Text>
