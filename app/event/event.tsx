@@ -53,7 +53,7 @@ export default function EventBuilder() {
     allergies: preset.allergies ?? [],
     allergyOther: preset.allergyOther ?? '',
     date: preset.date ?? null,
-    hour: preset.hour ?? null,
+    hour: preset.hour ?? { h: 10, m: 30 },
   });
 
   // "OK confirmed" flags for the specify boxes (turn the OK button green + tick)
@@ -63,10 +63,10 @@ export default function EventBuilder() {
 
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear]   = useState(new Date().getFullYear());
-  const [hourVal, setHourVal]   = useState(preset.hour?.h ?? 12);
-  const [minuteVal, setMinuteVal] = useState(preset.hour?.m ?? 0);
-  const [hourPicked, setHourPicked]     = useState(!!preset.hour);
-  const [minutePicked, setMinutePicked] = useState(!!preset.hour);
+  const [hourVal, setHourVal]   = useState(preset.hour?.h ?? 10);
+  const [minuteVal, setMinuteVal] = useState(preset.hour?.m ?? 30);
+  const [hourPicked, setHourPicked]     = useState(true);
+  const [minutePicked, setMinutePicked] = useState(true);
 
   const flatRef = useRef<FlatList>(null);
   const LOOPED = [...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES, ...CAROUSEL_IMAGES];
@@ -121,7 +121,9 @@ export default function EventBuilder() {
           <Ionicons name="arrow-back" size={24} color="#1a1612" /><Text style={s.backText}>Back</Text>
         </TouchableOpacity>
         <View style={s.headerCenter}><Text style={s.title}>Plan Your Event Cake</Text></View>
-        <View style={{ width: 70 }} />
+        <TouchableOpacity style={s.homeBtn} onPress={() => router.push('/tabs')}>
+          <Ionicons name="home" size={22} color="#CE6F79" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
@@ -303,33 +305,71 @@ export default function EventBuilder() {
           </View>
         )}
 
-        {step === 'hour' && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Hour</Text>
-            <View style={s.hourRow}>
-              <View style={s.hourBox}>
-                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
-                  {Array.from({ length: 24 }, (_, i) => i).map(h => (
-                    <TouchableOpacity key={h} style={[s.hourOption, hourPicked && hourVal === h && s.hourOptionActive]}
-                      onPress={() => { setHourVal(h); setHourPicked(true); setData(d => ({ ...d, hour: { h, m: minuteVal } })); }}>
-                      <Text style={[s.hourOptionText, hourPicked && hourVal === h && s.hourOptionTextActive]}>{String(h).padStart(2,'0')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <Text style={s.hourColon}>:</Text>
-                <ScrollView style={s.hourScroller} contentContainerStyle={{ paddingVertical: 8 }} nestedScrollEnabled>
-                  {Array.from({ length: 60 }, (_, i) => i).filter(m => m % 5 === 0).map(m => (
-                    <TouchableOpacity key={m} style={[s.hourOption, minutePicked && minuteVal === m && s.hourOptionActive]}
-                      onPress={() => { setMinuteVal(m); setMinutePicked(true); setData(d => ({ ...d, hour: { h: hourVal, m } })); }}>
-                      <Text style={[s.hourOptionText, minutePicked && minuteVal === m && s.hourOptionTextActive]}>{String(m).padStart(2,'0')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+        {step === 'hour' && (() => {
+          const ROW = 44;            // height of each time row
+          const VISIBLE = 5;         // rows visible (must be odd so one centers)
+          const PAD = ROW * Math.floor(VISIBLE / 2);
+          const HOURS = Array.from({ length: 24 }, (_, i) => i);
+          const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
+          const onHourScroll = (e: any) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.y / ROW);
+            const h = Math.max(0, Math.min(23, idx));
+            setHourVal(h); setHourPicked(true);
+            setData(d => ({ ...d, hour: { h, m: minuteVal } }));
+          };
+          const onMinScroll = (e: any) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.y / ROW);
+            const m = Math.max(0, Math.min(11, idx)) * 5;
+            setMinuteVal(m); setMinutePicked(true);
+            setData(d => ({ ...d, hour: { h: hourVal, m } }));
+          };
+          return (
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Time</Text>
+              <View style={s.hourRow}>
+                <View style={[s.hourBox, { height: ROW * VISIBLE }]}>
+                  {/* center selection bar */}
+                  <View pointerEvents="none" style={[s.centerBar, { top: PAD, height: ROW }]} />
+                  <ScrollView
+                    style={s.snapCol}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={ROW}
+                    decelerationRate="fast"
+                    contentContainerStyle={{ paddingVertical: PAD }}
+                    contentOffset={{ x: 0, y: hourVal * ROW }}
+                    onMomentumScrollEnd={onHourScroll}
+                    nestedScrollEnabled
+                  >
+                    {HOURS.map(h => (
+                      <View key={h} style={{ height: ROW, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={[s.snapTxt, hourVal === h && s.snapTxtActive]}>{String(h).padStart(2,'0')}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                  <Text style={s.hourColon}>:</Text>
+                  <ScrollView
+                    style={s.snapCol}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={ROW}
+                    decelerationRate="fast"
+                    contentContainerStyle={{ paddingVertical: PAD }}
+                    contentOffset={{ x: 0, y: (minuteVal / 5) * ROW }}
+                    onMomentumScrollEnd={onMinScroll}
+                    nestedScrollEnabled
+                  >
+                    {MINUTES.map(m => (
+                      <View key={m} style={{ height: ROW, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={[s.snapTxt, minuteVal === m && s.snapTxtActive]}>{String(m).padStart(2,'0')}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+                <View style={s.ampmBadge}><Text style={s.ampmText}>{hourVal >= 12 ? 'PM' : 'AM'}</Text></View>
               </View>
-              <View style={s.ampmBadge}><Text style={s.ampmText}>{hourVal >= 12 ? 'PM' : 'AM'}</Text></View>
+              <Text style={s.hourHint}>Scroll each column — the time in the pink bar is selected.</Text>
             </View>
-          </View>
-        )}
+          );
+        })()}
 
         {step === 'recall' && (
           <View style={s.section}>
@@ -349,7 +389,7 @@ export default function EventBuilder() {
               onPress={() => router.push({ pathname: '/event/quote', params: { cakeData: JSON.stringify(data), editId: editId ?? '' } })}>
               <Ionicons name="pricetag" size={20} color="#fff" /><Text style={s.confirmBtnText}>Get Quote</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.editBtn} onPress={() => setStepIdx(1)}><Text style={s.editBtnText}>No, Edit</Text></TouchableOpacity>
+            <TouchableOpacity style={s.editBtn} onPress={() => setStepIdx(i => i - 1)}><Text style={s.editBtnText}>No, Edit</Text></TouchableOpacity>
           </View>
         )}
 
@@ -430,7 +470,12 @@ const s = StyleSheet.create({
   calDayText:       { fontSize: 14, fontWeight: '600', color: '#1a1612' },
   calDayTextActive: { color: '#fff', fontWeight: '800' },
   hourRow:          { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  hourBox:          { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 8 },
+  hourBox:          { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 8, overflow: 'hidden', position: 'relative' },
+  snapCol:          { flex: 1 },
+  centerBar:        { position: 'absolute', left: 8, right: 8, backgroundColor: 'rgba(206,111,121,0.14)', borderWidth: 2, borderColor: PINK_DARK, borderRadius: 10 },
+  snapTxt:          { fontSize: 20, fontWeight: '700', color: '#b8b8b8' },
+  snapTxtActive:    { color: PINK_DARK, fontWeight: '900' },
+  hourHint:         { fontSize: 12, color: '#9a8f8f', textAlign: 'center', marginTop: 14 },
   hourScroller:     { flex: 1, maxHeight: 200 },
   hourOption:       { paddingVertical: 12, alignItems: 'center' },
   hourOptionActive: { backgroundColor: PINK_DARK, borderRadius: 8 },
@@ -439,6 +484,7 @@ const s = StyleSheet.create({
   hourColon:        { fontSize: 20, fontWeight: '800', color: '#1a1612' },
   ampmBadge:        { backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16 },
   ampmText:         { fontSize: 16, fontWeight: '900', color: '#fff' },
+  homeBtn:          { width: 70, alignItems: 'flex-end', justifyContent: 'center' },
   recallBox:        { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1.5, borderColor: PINK_MID, marginBottom: 20 },
   recallRow:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   recallLabel:      { fontSize: 13, color: '#6b6b6b', fontWeight: '600' },
@@ -448,7 +494,7 @@ const s = StyleSheet.create({
   editBtn:          { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 2.5, borderColor: PINK_DARK, backgroundColor: '#fff' },
   editBtnText:      { fontSize: 14, fontWeight: '800', color: PINK_DARK },
   stepIndicator:    { fontSize: 12, color: '#6b6b6b', textAlign: 'center', marginTop: 24 },
-  footer:           { padding: 20, paddingBottom: 32, borderTopWidth: 1, borderTopColor: PINK_MID, backgroundColor: '#fff' },
+  footer:           { padding: 20, paddingBottom: 48, borderTopWidth: 1, borderTopColor: PINK_MID, backgroundColor: '#fff' },
   nextBtn:          { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   nextBtnDisabled:  { opacity: 0.4 },
   nextBtnText:      { fontSize: 16, fontWeight: '700', color: '#fff' },

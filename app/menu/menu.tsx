@@ -52,10 +52,7 @@ function ProductModal({ product, onClose }: { product: typeof PRODUCTS[0] | null
             <Text style={modal.desc}>{product.details}</Text>
             <View style={modal.priceRow}>
             </View>
-            <View style={modal.pickupNote}>
-              <Ionicons name="storefront" size={18} color={PINK_DARK} />
-              <Text style={modal.pickupNoteTxt}>Pickup Only — available in-store</Text>
-            </View>
+            <View style={modal.pickupSpacer} />
           </ScrollView>
         </View>
       </View>
@@ -106,9 +103,7 @@ export default function Menu() {
             <View style={s.cardBody}>
               <Text style={s.cardName}>{product.name}</Text>
               <Text style={s.cardDesc} numberOfLines={2}>{product.description}</Text>
-              <View style={s.cardBottomRow}>
-                <View style={s.pickupChip}><Text style={s.pickupChipTxt}>Pickup Only</Text></View>
-              </View>
+
             </View>
           </TouchableOpacity>
         ))}
@@ -135,7 +130,7 @@ const s = StyleSheet.create({
   search:       { flex: 1, paddingVertical: 12, fontSize: 15, color: '#1a1612' },
   list:         { paddingHorizontal: 16, paddingTop: 14 },
   card:         { backgroundColor: '#fff', borderRadius: 18, marginBottom: 20, overflow: 'hidden', elevation: 2 },
-  cardImgWrap:  { width: '100%', height: 180, backgroundColor: PINK_LIGHT },
+  cardImgWrap:  { width: '100%', aspectRatio: 1, backgroundColor: PINK_LIGHT },
   cardBody:     { padding: 16 },
   cardName:     { fontSize: 17, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   cardDesc:     { fontSize: 13, color: '#6b6b6b', lineHeight: 19, marginBottom: 8 },
@@ -165,5 +160,6 @@ const modal = StyleSheet.create({
   qtyBtn:       { padding: 4 },
   qtyText:      { fontSize: 18, fontWeight: '800', color: '#1a1612', minWidth: 24, textAlign: 'center' },
   pickupNote:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PINK_LIGHT, borderRadius: 14, paddingVertical: 16, marginBottom: 24 },
+  pickupSpacer: { height: 24 },
   pickupNoteTxt:{ fontSize: 15, fontWeight: '800', color: PINK_DARK },
 });

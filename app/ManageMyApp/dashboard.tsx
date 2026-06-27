@@ -221,8 +221,8 @@ export default function ManagerDashboard() {
 
   const liveOrders      = orders.filter(o => o.status !== 'completed' && o.status !== 'ready' && !o.assignedToDriver);
   const readyOrders     = orders.filter(o => o.orderType === 'pickup' && o.status === 'ready');
-  const driverOrders    = orders.filter(o => o.assignedToDriver && o.driverStatus !== 'delivered' && o.status !== 'completed');
-  const completedOrders = orders.filter(o => o.status === 'completed' || o.driverStatus === 'delivered');
+  const driverOrders    = orders.filter(o => o.assignedToDriver && o.status !== 'completed');
+  const completedOrders = orders.filter(o => o.status === 'completed');
 
   const TABS: { key: typeof tab; label: string; count: number }[] = [
     { key: 'live',      label: 'Live Orders',   count: liveOrders.length },

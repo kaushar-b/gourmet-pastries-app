@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
+import { BackHandler } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useCart } from '../../context/CartContext';
 import { computeCakeTotal, allergyDisplay, CAKE_TYPE_LABELS, CakeData } from '../../constants/eventPricing';
@@ -18,6 +20,13 @@ function fmtHour(h: any) {
 
 export default function Quote() {
   const router = useRouter();
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.back();   // mobile back -> recall page (same as the top arrow)
+      return true;     // prevent default; scoped to this screen only
+    });
+    return () => sub.remove();
+  }, [router]);
   const { addToCart, updateCartItem } = useCart();
   const params = useLocalSearchParams<{ cakeData: string; editId?: string }>();
   const data: CakeData | null = params.cakeData ? JSON.parse(params.cakeData) : null;

@@ -52,8 +52,9 @@ function CakeBlock({ cake }: { cake: any }) {
       <Row l="Date" v={fmtDate(cake.date)} />
       <Row l="Time" v={fmtHour(cake.hour)} />
       {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}
-      <Row l="Full Price" v={`P ${cake.total}.00`} />
-      <Row l="Deposit Paid" v={`P ${cake.deposit}.00`} />
+      <Row l="Total" v={`P ${cake.total}.00`} />
+      <Row l="Total Incl VAT (14%)" v={`P ${cake.total + Math.round(cake.total * 0.14)}.00`} />
+      <Row l="Deposit Paid (50% + Full VAT)" v={`P ${cake.deposit + Math.round(cake.total * 0.14)}.00`} />
     </View>
   );
 }
@@ -118,7 +119,7 @@ function OrderRow({ order }: { order: Order }) {
           </View>
           {remaining > 0 && (
             <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Remaining (on collection)</Text>
+              <Text style={s.totalLabel}>Remaining {order.orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text>
               <Text style={s.totalVal}>P {remaining}.00</Text>
             </View>
           )}

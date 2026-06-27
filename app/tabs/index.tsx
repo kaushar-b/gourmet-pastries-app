@@ -140,7 +140,7 @@ export default function Home() {
         {/* Big single-image slideshow */}
         <View style={styles.sectionWrap}>
           <TouchableOpacity style={styles.slideshowWrap} activeOpacity={0.9}>
-            <Image source={SLIDESHOW_ITEMS[slideIdx].image} style={{ width: '100%', height: (SW - 32) * 0.62 }} resizeMode="cover" />
+            <Image source={SLIDESHOW_ITEMS[slideIdx].image} style={{ width: '100%', height: SW - 32 }} resizeMode="cover" />
             <Text style={styles.slideshowLabel}>{SLIDESHOW_ITEMS[slideIdx].text}</Text>
           </TouchableOpacity>
         </View>

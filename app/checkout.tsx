@@ -169,6 +169,7 @@ export default function Checkout() {
             <TouchableOpacity style={[s.toggleBtn, orderType === 'delivery' && s.toggleActive]} onPress={() => setOrderType('delivery')}>
               <Ionicons name="car-sport" size={26} color={orderType === 'delivery' ? '#fff' : PINK_DARK} />
               <Text style={[s.toggleTitle, orderType === 'delivery' && s.toggleTitleActive]}>Delivery</Text>
+              <Text style={[s.toggleSub, orderType === 'delivery' && s.toggleTitleActive]}>Free</Text>
             </TouchableOpacity>
           </View>
 
@@ -187,6 +188,7 @@ export default function Checkout() {
               {errors.address1 ? <Text style={s.errTxt}>{errors.address1}</Text> : null}
               <TextInput style={s.input} placeholder="Street / House number" placeholderTextColor="#b58a8d" value={address1} onChangeText={setAddress1} />
               <TextInput style={s.input} placeholder="Area / Suburb" placeholderTextColor="#b58a8d" value={address2} onChangeText={setAddress2} />
+              <TextInput style={[s.input, s.inputFixed]} value="Phakalane" editable={false} />
             </>
           )}
 
@@ -209,8 +211,9 @@ export default function Checkout() {
             ))}
             <View style={s.summaryDivider} />
             <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {cakeFull}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Including VAT (14%)</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining (on collection)</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Incl VAT (14%)</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining {orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>
+            {orderType === 'delivery' && <View style={s.summaryRow}><Text style={s.summaryItem}>Delivery</Text><Text style={[s.summaryPrice, { color: '#22c55e' }]}>Free</Text></View>}
             {tip > 0 && <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tip}.00</Text></View>}
             <View style={s.summaryDivider} />
             <View style={s.summaryRow}><Text style={s.grandLabel}>50% + Full VAT</Text><Text style={s.grandVal}>P {grandTotal}.00</Text></View>
@@ -239,7 +242,8 @@ const s = StyleSheet.create({
   sectionLabel:    { fontSize: 15, fontWeight: '700', color: '#1a1612', marginBottom: 8, marginTop: 16 },
   errTxt:          { fontSize: 12, color: '#C65C69', marginBottom: 6 },
   toggleRow:       { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  toggleBtn:       { flex: 1, alignItems: 'center', padding: 16, borderRadius: 14, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, gap: 6, elevation: 1 },
+  toggleBtn:       { flex: 1, alignItems: 'center', padding: 16, borderRadius: 14, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, gap: 4, elevation: 1 },
+  toggleSub:       { fontSize: 11, fontWeight: '800', color: '#22c55e' },
   toggleActive:    { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   toggleTitle:     { fontSize: 14, fontWeight: '800', color: PINK_DARK },
   toggleTitleActive:{ color: '#fff' },
@@ -257,6 +261,7 @@ const s = StyleSheet.create({
   summaryBox:      { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: PINK_MID, elevation: 1 },
   summaryRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryItem:     { fontSize: 13, color: '#6b6b6b', flex: 1, paddingRight: 8 },
+  inputFixed:      { backgroundColor: '#f3f3f3', color: '#1a1612' },
   summaryPrice:    { fontSize: 13, fontWeight: '600', color: '#1a1612' },
   summaryDivider:  { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 6 },
   grandLabel:      { fontSize: 16, fontWeight: '800', color: '#1a1612' },
