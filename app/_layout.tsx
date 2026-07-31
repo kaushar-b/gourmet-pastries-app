@@ -53,7 +53,7 @@ function AuthGate() {
 
   useEffect(() => {
     if (!loaded) return;
-    const inAuth   = segments[0] === 'auth';
+    const inAuth   = segments[0] === 'auth' && segments[1] !== 'change-password';
     const inManage = segments[0] === 'ManageMyApp';
 
     if (!user && !inAuth && !inManage) {
