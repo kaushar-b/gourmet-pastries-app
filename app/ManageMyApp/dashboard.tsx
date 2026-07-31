@@ -153,9 +153,9 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
           <TouchableOpacity style={[c.actionBtn, order.status === 'preparing' && c.actionBtnActive]} onPress={markPreparing}>
             <Text style={[c.actionBtnTxt, order.status === 'preparing' && c.actionBtnTxtActive]}>Preparing</Text>
           </TouchableOpacity>
-          {order.orderType === 'pickup'
+          {order.status === 'preparing' && (order.orderType === 'pickup'
             ? <TouchableOpacity style={c.actionBtn} onPress={markReadyPickup}><Text style={c.actionBtnTxt}>Ready for Pickup</Text></TouchableOpacity>
-            : <TouchableOpacity style={c.actionBtn} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>}
+            : <TouchableOpacity style={c.actionBtn} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>)}
         </View>
       )}
 

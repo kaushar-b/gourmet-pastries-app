@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Gourmet Fine Pastries",
+    "name": "Gourmet Fine Pastries Phakalane",
     "slug": "gourmet-pastries-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/adaptive-icon.png",
+    "icon": "./assets/mobile-app-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {

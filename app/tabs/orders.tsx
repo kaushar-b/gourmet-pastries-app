@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ref, onValue } from 'firebase/database';
-import { allergyDisplay, CAKE_TYPE_LABELS } from '../../constants/eventPricing';
+import { allergyDisplay, CAKE_TYPE_LABELS, VAT_RATE } from '../../constants/eventPricing';
 import { onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../../lib/firebase';
 
@@ -53,8 +53,8 @@ function CakeBlock({ cake }: { cake: any }) {
       <Row l="Time" v={fmtHour(cake.hour)} />
       {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}
       <Row l="Total" v={`P ${cake.total}.00`} />
-      <Row l="Total Incl VAT (14%)" v={`P ${cake.total + Math.round(cake.total * 0.14)}.00`} />
-      <Row l="Deposit Paid (50% + Full VAT)" v={`P ${cake.deposit + Math.round(cake.total * 0.14)}.00`} />
+      <Row l="Total Incl VAT" v={`P ${cake.total + Math.round(cake.total * VAT_RATE)}.00`} />
+      <Row l="Deposit Paid (50% + Full VAT)" v={`P ${cake.deposit + Math.round(cake.total * VAT_RATE)}.00`} />
     </View>
   );
 }
@@ -215,3 +215,5 @@ const s = StyleSheet.create({
   balanceText:  { fontSize: 14, fontWeight: '800' },
   balancePillNarrow: { alignSelf: 'flex-start' },
 });
+
+

@@ -59,13 +59,13 @@ export default function About() {
             <Ionicons name="mail" size={20} color={PINK_DARK} />
             <Text style={s.rowTitle}>Contact</Text>
           </View>
-          <Text style={s.rowText}>gourmetpastries.bw@gmail.com</Text>
+          <Text style={s.rowText}>contact@gourmetpastries.co.bw</Text>
         </View>
 
-        <TouchableOpacity style={s.policyBtn} onPress={() => router.push('/policy')}>
-          <Ionicons name="document-text-outline" size={20} color={PINK_DARK} />
-          <Text style={s.policyBtnText}>Policies</Text>
-          <Ionicons name="chevron-forward" size={20} color={PINK_DARK} />
+        <TouchableOpacity style={s.policyBtn} onPress={() => Linking.openURL('https://gourmetpastries.co.bw')}>
+          <Ionicons name="globe-outline" size={20} color={PINK_DARK} />
+          <Text style={s.policyBtnText}>Our Site</Text>
+          <Ionicons name="open-outline" size={18} color={PINK_DARK} />
         </TouchableOpacity>
 
         <View style={{ height: 30 }} />
