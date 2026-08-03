@@ -9,6 +9,7 @@ const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
 const VAT_RATE   = 0.14;
+const MIN_ORDER  = 120;
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -41,6 +42,9 @@ export default function Cart() {
   const subtotal  = menuFull + cakeFull;
   const vatAmount = Math.round(subtotal - subtotal / (1 + VAT_RATE));
   const dueNow    = menuFull + cakeDeposit + tips;
+
+  // Minimum only applies to menu-only carts; any cake bypasses it.
+  const belowMin  = cakeItems.length === 0 && menuFull < MIN_ORDER;
 
   if (items.length === 0) {
     return (
@@ -161,7 +165,14 @@ export default function Cart() {
           <View style={s.divider} />
           <View style={s.totalRow}><Text style={s.grandLabel}>Due Now</Text><Text style={s.grandVal}>P {dueNow}.00</Text></View>
         </View>
-        <TouchableOpacity style={s.checkoutBtn} onPress={() => router.push('/checkout')}>
+        {belowMin && (
+          <Text style={s.minText}>Minimum order P{MIN_ORDER}.00 (menu items)</Text>
+        )}
+        <TouchableOpacity
+          style={[s.checkoutBtn, belowMin && s.checkoutDisabled]}
+          disabled={belowMin}
+          onPress={() => router.push('/checkout')}
+        >
           <Ionicons name="card" size={20} color="#fff" />
           <Text style={s.checkoutBtnText}>Proceed to Checkout</Text>
         </TouchableOpacity>
@@ -217,6 +228,8 @@ const s = StyleSheet.create({
   divider:       { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 4 },
   grandLabel:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   grandVal:      { fontSize: 16, fontWeight: '800', color: PINK_DARK },
+  minText:       { fontSize: 13, fontWeight: '800', color: '#C65C69', textAlign: 'center', marginTop: -4 },
   checkoutBtn:   { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 2 },
+  checkoutDisabled: { opacity: 0.4 },
   checkoutBtnText:{ fontSize: 16, fontWeight: '700', color: '#fff' },
 });
