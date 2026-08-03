@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../context/CartContext';
-import { ref, set, push, get } from 'firebase/database';
+import { ref, set, push, get, runTransaction } from 'firebase/database';
 import { db, auth } from '../lib/firebase';
 import { sendPushNotification, CHANNELS } from '../lib/notifications';
 import { VAT_RATE } from '../constants/eventPricing';
@@ -27,22 +27,31 @@ export default function Checkout() {
   const [placing, setPlacing]         = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
-  const cakeFull      = items.reduce((sm, i) => sm + (i.cakeOrder?.total ?? 0), 0);
+  // Cake items (have cakeOrder): charged 50% deposit now, 50% remaining on collection.
+  // Regular items (no cakeOrder): charged 100% now.
+  const cakeFull    = items.reduce((sm, i) => sm + (i.cakeOrder ? (i.cakeOrder.total ?? 0) : 0), 0);
+  const regularFull = items.reduce((sm, i) => sm + (i.cakeOrder ? 0 : (i.price ?? 0) * (i.quantity ?? 1)), 0);
+  const orderTotal  = cakeFull + regularFull;
+
   const cakeDeposit   = Math.round(cakeFull * 0.5);
   const cakeRemaining = cakeFull - cakeDeposit;
-  const vatAmount     = Math.round(cakeFull * VAT_RATE);
-  const totalInclVat  = cakeFull + vatAmount;
-  const grandTotal    = cakeDeposit + vatAmount + tip;
+  const vatAmount     = Math.round(orderTotal - orderTotal / (1 + VAT_RATE));
+  const grandTotal    = cakeDeposit + regularFull + tip;
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!orderType) e.orderType = 'Please select Pickup or Delivery';
-    if (!name.trim()) e.name = 'Full name is required';
-    if (!phone.trim()) e.phone = 'Phone number is required';
-    if (phone.trim().length !== 8) e.phone = 'Phone number must be 8 digits';
-    if (orderType === 'delivery' && !address1.trim()) e.address1 = 'Address is required';
+    const missing: string[] = [];
+    if (!orderType) { e.orderType = 'Please select Pickup or Delivery'; missing.push('Select Pickup or Delivery'); }
+    if (!name.trim()) { e.name = 'Full name is required'; missing.push('Enter your full name'); }
+    if (!phone.trim()) { e.phone = 'Phone number is required'; missing.push('Enter your phone number'); }
+    else if (phone.trim().length !== 8) { e.phone = 'Phone number must be 8 digits'; missing.push('Enter a valid 8-digit phone number'); }
+    if (orderType === 'delivery' && !address1.trim()) { e.address1 = 'Address is required'; missing.push('Enter your delivery address'); }
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (missing.length > 0) {
+      Alert.alert('Almost there!', 'Please complete the following:\n\n\u2022 ' + missing.join('\n\u2022 '));
+      return false;
+    }
+    return true;
   };
 
   const handlePlaceOrder = async () => {
@@ -51,6 +60,15 @@ export default function Checkout() {
     try {
       const user = auth.currentUser;
       const customerToken = user ? (await get(ref(db, `userTokens/${user.uid}`))).val() : null;
+
+      // atomic global order number (never block the order if this fails)
+      let orderNumber: number | null = null;
+      try {
+        const txn = await runTransaction(ref(db, 'orderCounter'), (curr) => (curr || 0) + 1);
+        orderNumber = txn.snapshot.val();
+      } catch (ctrErr) {
+        orderNumber = null;
+      }
 
       const enrichedItems = items.map(i => {
         if (!i.cakeOrder) return { name: i.name, price: i.price, quantity: i.quantity, cakeOrder: null };
@@ -63,6 +81,7 @@ export default function Checkout() {
       });
 
       const orderData = {
+        orderNumber,
         name: name.trim(),
         phone: '+267' + phone.trim(),
         orderType,
@@ -71,7 +90,7 @@ export default function Checkout() {
         paymentMethod,
         tip,
         items: enrichedItems,
-        subtotal: cakeFull,
+        subtotal: orderTotal,
         total: grandTotal,
         vatAmount,
         cakeRemaining,
@@ -96,8 +115,8 @@ export default function Checkout() {
 
       clearCart();
       setOrderPlaced(true);
-    } catch (err) {
-      Alert.alert('Error', 'Could not place order. Please try again.');
+    } catch (err: any) {
+      Alert.alert('Error', 'Could not place order: ' + (err?.message || 'Please try again'));
     } finally {
       setPlacing(false);
     }
@@ -129,7 +148,7 @@ export default function Checkout() {
         <View style={s.confirmBox}>
           <Ionicons name="checkmark-circle" size={72} color={PINK_DARK} />
           <Text style={s.confirmTitle}>Order Placed!</Text>
-          <Text style={s.confirmSub}>We've received your order and your 50% deposit. We'll start preparing it shortly.</Text>
+          <Text style={s.confirmSub}>We've received your order. We'll start preparing it shortly.</Text>
           <TouchableOpacity style={s.confirmBtn} onPress={() => router.replace('/tabs')}>
             <Text style={s.confirmBtnText}>Back to Home</Text>
           </TouchableOpacity>
@@ -142,6 +161,8 @@ export default function Checkout() {
     );
   }
 
+  const hasCake = cakeFull > 0;
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.container}>
@@ -152,12 +173,14 @@ export default function Checkout() {
           <Text style={s.title}>Checkout</Text>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }}>
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 160 }}>
 
-          <View style={s.depositNote}>
-            <Ionicons name="information-circle" size={20} color={PINK_DARK} />
-            <Text style={s.depositNoteText}>50% Down Payment required to confirm your order</Text>
-          </View>
+          {hasCake && (
+            <View style={s.depositNote}>
+              <Ionicons name="information-circle" size={20} color={PINK_DARK} />
+              <Text style={s.depositNoteText}>Custom cakes require a 50% deposit to confirm. Menu items are paid in full.</Text>
+            </View>
+          )}
 
           <Text style={s.sectionLabel}>How would you like your order?</Text>
           {errors.orderType ? <Text style={s.errTxt}>{errors.orderType}</Text> : null}
@@ -205,25 +228,28 @@ export default function Checkout() {
           <View style={s.summaryBox}>
             {items.map(item => (
               <View key={item.id} style={s.summaryRow}>
-                <Text style={s.summaryItem}>{item.name}</Text>
-                <Text style={s.summaryPrice}>P {item.cakeOrder?.total ?? item.price}.00</Text>
+                <Text style={s.summaryItem}>{item.name}{!item.cakeOrder && (item.quantity ?? 1) > 1 ? ` x${item.quantity}` : ''}</Text>
+                <Text style={s.summaryPrice}>P {item.cakeOrder ? (item.cakeOrder.total ?? 0) : (item.price ?? 0) * (item.quantity ?? 1)}.00</Text>
               </View>
             ))}
             <View style={s.summaryDivider} />
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {cakeFull}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Total Incl VAT (14%)</Text><Text style={s.summaryPrice}>P {totalInclVat}.00</Text></View>
-            <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining {orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>Total</Text><Text style={s.summaryPrice}>P {orderTotal}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.summaryItem}>VAT incl. (14%)</Text><Text style={s.summaryPrice}>P {vatAmount}.00</Text></View>
+            <View style={s.summaryDivider} />
+            {hasCake && <View style={s.summaryRow}><Text style={s.summaryItem}>Cake Deposit (50%)</Text><Text style={s.summaryPrice}>P {cakeDeposit}.00</Text></View>}
+            {regularFull > 0 && <View style={s.summaryRow}><Text style={s.summaryItem}>Items (paid in full)</Text><Text style={s.summaryPrice}>P {regularFull}.00</Text></View>}
             {orderType === 'delivery' && <View style={s.summaryRow}><Text style={s.summaryItem}>Delivery</Text><Text style={[s.summaryPrice, { color: '#22c55e' }]}>Free</Text></View>}
             {tip > 0 && <View style={s.summaryRow}><Text style={s.summaryItem}>Driver Tip</Text><Text style={s.summaryPrice}>P {tip}.00</Text></View>}
             <View style={s.summaryDivider} />
-            <View style={s.summaryRow}><Text style={s.grandLabel}>50% + Full VAT</Text><Text style={s.grandVal}>P {grandTotal}.00</Text></View>
+            <View style={s.summaryRow}><Text style={s.grandLabel}>Pay Now</Text><Text style={s.grandVal}>P {grandTotal}.00</Text></View>
+            {hasCake && <View style={s.summaryRow}><Text style={s.summaryItem}>Remaining {orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text><Text style={s.summaryPrice}>P {cakeRemaining}.00</Text></View>}
           </View>
 
         </ScrollView>
 
         <View style={s.footer}>
           <TouchableOpacity style={[s.placeBtn, placing && { opacity: 0.6 }]} onPress={handlePlaceOrder} disabled={placing}>
-            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+            <Ionicons name="checkmark-circle" size={22} color="#fff" />
             <Text style={s.placeBtnText}>{placing ? 'Placing Order...' : `Place Order — P ${grandTotal}.00`}</Text>
           </TouchableOpacity>
         </View>
@@ -242,22 +268,22 @@ const s = StyleSheet.create({
   sectionLabel:    { fontSize: 15, fontWeight: '700', color: '#1a1612', marginBottom: 8, marginTop: 16 },
   errTxt:          { fontSize: 12, color: '#C65C69', marginBottom: 6 },
   toggleRow:       { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  toggleBtn:       { flex: 1, alignItems: 'center', padding: 16, borderRadius: 14, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, gap: 4, elevation: 1 },
+  toggleBtn:       { flex: 1, alignItems: 'center', padding: 18, borderRadius: 14, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, gap: 4, elevation: 1 },
   toggleSub:       { fontSize: 11, fontWeight: '800', color: '#22c55e' },
   toggleActive:    { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
-  toggleTitle:     { fontSize: 14, fontWeight: '800', color: PINK_DARK },
+  toggleTitle:     { fontSize: 15, fontWeight: '800', color: PINK_DARK },
   toggleTitleActive:{ color: '#fff' },
   tipRow:          { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  tipBtn:          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID },
+  tipBtn:          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID },
   tipBtnActive:    { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   tipBtnText:      { fontSize: 14, fontWeight: '800', color: '#1a1612' },
   tipBtnTextActive:{ color: '#fff' },
-  input:           { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding: 14, fontSize: 15, color: '#1a1612', marginBottom: 10 },
+  input:           { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding: 15, fontSize: 15, color: '#1a1612', marginBottom: 10 },
   phoneRow:        { flexDirection: 'row', gap: 8, marginBottom: 10 },
   phonePrefix:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, paddingHorizontal: 12 },
   phoneFlag:       { fontSize: 18 },
   phonePrefixText: { fontSize: 15, fontWeight: '800', color: '#1a1612' },
-  phoneInput:      { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding: 14, fontSize: 15, color: '#1a1612' },
+  phoneInput:      { flex: 1, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1.5, borderColor: PINK_MID, padding:15, fontSize: 15, color: '#1a1612' },
   summaryBox:      { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: PINK_MID, elevation: 1 },
   summaryRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryItem:     { fontSize: 13, color: '#6b6b6b', flex: 1, paddingRight: 8 },
@@ -267,8 +293,8 @@ const s = StyleSheet.create({
   grandLabel:      { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   grandVal:        { fontSize: 16, fontWeight: '800', color: PINK_DARK },
   footer:          { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 36, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: PINK_LIGHT, elevation: 10 },
-  placeBtn:        { backgroundColor: PINK_DARK, borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  placeBtnText:    { fontSize: 16, fontWeight: '700', color: '#fff' },
+  placeBtn:        { backgroundColor: PINK_DARK, borderRadius: 14, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  placeBtnText:    { fontSize: 17, fontWeight: '800', color: '#fff' },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32 },
   emptyText:       { fontSize: 17, fontWeight: '700', color: '#6b6b6b' },
   shopBtn:         { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 },

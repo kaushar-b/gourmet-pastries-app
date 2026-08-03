@@ -21,7 +21,7 @@ function fmtHour(h: any) {
 }
 
 type Order = {
-  id: string; date: string; name: string; phone: string;
+  id: string; orderNumber?: number | null; date: string; name: string; phone: string;
   orderType: 'pickup' | 'delivery'; address?: string; address2?: string;
   paymentMethod?: string | null; tip?: number;
   items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
@@ -76,82 +76,86 @@ function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'compl
 
   return (
     <View style={s.card}>
-      <View style={s.cardHeader}>
-        <Text style={s.cardDate}>{order.date}</Text>
-        <View style={s.typeBadge}><Text style={s.typeBadgeText}>{order.orderType.toUpperCase()}</Text></View>
+      <View style={s.orderBar}>
+        <Text style={s.orderBarLabel}>Order</Text>
+        <Text style={s.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
-      <Text style={s.cardName}>{order.name}</Text>
-      <Text style={s.totalTxt}>Total: P {order.total}.00</Text>
-      {remaining > 0 && (
-        order.paid
-          ? <View style={s.paidBadge}><Ionicons name="checkmark-circle" size={15} color="#22c55e" /><Text style={s.paidBadgeText}>Balance Paid</Text></View>
-          : <Text style={s.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
-      )}
-
-      <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
-        <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
-      </TouchableOpacity>
-
-      {open && (
-        <View>
-          {order.phone ? <View style={s.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.phone}</Text></View> : null}
-          {order.address ? <View style={s.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
-          {order.tip ? <View style={s.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[s.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
-          <View style={s.divider} />
-          {order.items?.map((item, i) => (
-            <View key={i}>
-              <View style={s.itemRow}><Text style={s.itemName}>{item.quantity}× {item.name}</Text><Text style={s.itemPrice}>P {item.price * item.quantity}.00</Text></View>
-              {item.cakeOrder && <CakeBlock cake={item.cakeOrder} />}
-            </View>
-          ))}
+      <View style={s.cardInner}>
+        <View style={s.cardHeader}>
+          <Text style={s.cardDate}>{order.date}</Text>
+          <View style={s.typeBadge}><Text style={s.typeBadgeText}>{order.orderType.toUpperCase()}</Text></View>
         </View>
-      )}
+        <Text style={s.cardName}>{order.name}</Text>
+        <Text style={s.totalTxt}>Total: P {order.total}.00</Text>
+        {remaining > 0 && (
+          order.paid
+            ? <View style={s.paidBadge}><Ionicons name="checkmark-circle" size={15} color="#22c55e" /><Text style={s.paidBadgeText}>Balance Paid</Text></View>
+            : <Text style={s.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
+        )}
 
-      {tab === 'live' && (() => {
-        const delivered = order.driverStatus === 'delivered';
-        const isPaid = order.paid || remaining <= 0;
-        if (delivered && isPaid) {
+        <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
+          <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
+        </TouchableOpacity>
+
+        {open && (
+          <View>
+            {order.phone ? <View style={s.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.phone}</Text></View> : null}
+            {order.address ? <View style={s.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
+            {order.tip ? <View style={s.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[s.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
+            <View style={s.divider} />
+            {order.items?.map((item, i) => (
+              <View key={i}>
+                <View style={s.itemRow}><Text style={s.itemName}>{item.quantity}× {item.name}</Text><Text style={s.itemPrice}>P {item.price * item.quantity}.00</Text></View>
+                {item.cakeOrder && <CakeBlock cake={item.cakeOrder} />}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {tab === 'live' && (() => {
+          const delivered = order.driverStatus === 'delivered';
+          const isPaid = order.paid || remaining <= 0;
+          if (delivered && isPaid) {
+            return (
+              <View style={s.actionCol}>
+                <TouchableOpacity style={s.completeBtn} onPress={markOrderCompleted}>
+                  <Text style={s.completeBtnTxt}>Order Completed</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
           return (
-            <View style={s.actionCol}>
-              <TouchableOpacity style={s.completeBtn} onPress={markOrderCompleted}>
-                <Text style={s.completeBtnTxt}>Order Completed</Text>
+            <View style={s.actionRow}>
+              <TouchableOpacity
+                style={[s.pillBtn, isPaid ? s.pillPaid : (!delivered && s.pillDisabled)]}
+                disabled={!delivered || isPaid}
+                onPress={markPaidConfirm}
+              >
+                {isPaid
+                  ? <Text style={s.pillPaidTxt}>{'✓'} Paid</Text>
+                  : <Text style={s.pillTxt}>Paid</Text>}
               </TouchableOpacity>
+
+              {order.driverStatus !== 'on_the_way' && !delivered && (
+                <TouchableOpacity style={s.pillBtn} onPress={markOnTheWay}>
+                  <Text style={s.pillTxt}>On the Way!</Text>
+                </TouchableOpacity>
+              )}
+              {order.driverStatus === 'on_the_way' && (
+                <TouchableOpacity style={s.pillBtnBlue} onPress={markDelivered}>
+                  <Text style={s.pillTxtBlue}>Delivered</Text>
+                </TouchableOpacity>
+              )}
+              {delivered && (
+                <View style={s.pillBtnBlueFilled}>
+                  <Text style={s.pillTxtWhite}>{'✓'} Delivered</Text>
+                </View>
+              )}
             </View>
           );
-        }
-        return (
-          <View style={s.actionRow}>
-            {/* Paid button — disabled until delivered */}
-            <TouchableOpacity
-              style={[s.pillBtn, isPaid ? s.pillPaid : (!delivered && s.pillDisabled)]}
-              disabled={!delivered || isPaid}
-              onPress={markPaidConfirm}
-            >
-              {isPaid
-                ? <Text style={s.pillPaidTxt}>✓ Paid</Text>
-                : <Text style={s.pillTxt}>Paid</Text>}
-            </TouchableOpacity>
-
-            {/* Status button: On the Way! -> Delivered */}
-            {order.driverStatus !== 'on_the_way' && !delivered && (
-              <TouchableOpacity style={s.pillBtn} onPress={markOnTheWay}>
-                <Text style={s.pillTxt}>On the Way!</Text>
-              </TouchableOpacity>
-            )}
-            {order.driverStatus === 'on_the_way' && (
-              <TouchableOpacity style={s.pillBtnBlue} onPress={markDelivered}>
-                <Text style={s.pillTxtBlue}>Delivered</Text>
-              </TouchableOpacity>
-            )}
-            {delivered && (
-              <View style={s.pillBtnBlueFilled}>
-                <Text style={s.pillTxtWhite}>✓ Delivered</Text>
-              </View>
-            )}
-          </View>
-        );
-      })()}
+        })()}
+      </View>
     </View>
   );
 }
@@ -235,7 +239,11 @@ const s = StyleSheet.create({
   tabBtnTextActive: { color: PINK_DARK },
   empty:            { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText:        { fontSize: 16, fontWeight: '700', color: '#6b6b6b' },
-  card:             { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, elevation: 2 },
+  card:             { backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, elevation: 2, overflow: 'hidden' },
+  orderBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 14, paddingVertical: 9 },
+  orderBarLabel:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+  orderBarNum:      { fontSize: 22, fontWeight: '900', color: '#fff' },
+  cardInner:        { padding: 16 },
   cardHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   cardDate:         { fontSize: 12, color: '#6b6b6b' },
   typeBadge:        { backgroundColor: PINK_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
@@ -259,11 +267,9 @@ const s = StyleSheet.create({
   sumLabel:         { fontSize: 12, color: '#6b6b6b', fontWeight: '600' },
   sumValue:         { fontSize: 12, color: '#1a1612', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 12 },
   actionCol:        { gap: 8, marginTop: 12 },
-  actionBtn:        { backgroundColor: PINK_DARK, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  actionBtnTxt:     { fontSize: 14, fontWeight: '800', color: '#fff' },
   actionRow:        { flexDirection: 'row', gap: 10, marginTop: 12 },
   pillBtn:          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#fff', borderWidth: 2, borderColor: '#CE6F79' },
-  pillTxt:          { fontSize: 14, fontWeight: '800', color: '#CE6F79' },
+  pillTxt:          { fontSize: 14, fontWeight: '800', color: PINK_DARK },
   pillDisabled:     { opacity: 0.35 },
   pillPaid:         { backgroundColor: '#22c55e', borderColor: '#22c55e' },
   pillPaidTxt:      { fontSize: 14, fontWeight: '800', color: '#fff' },

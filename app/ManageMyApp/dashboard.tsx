@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { ref, onValue, update, set, remove, get } from 'firebase/database';
 import { signOut } from 'firebase/auth';
@@ -21,7 +23,7 @@ function fmtHour(h: any) {
 }
 
 type Order = {
-  id: string; date: string; name: string; phone: string;
+  id: string; orderNumber?: number | null; date: string; name: string; phone: string;
   orderType: 'pickup' | 'delivery'; address?: string; address2?: string;
   paymentMethod?: string | null; tip?: number;
   items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
@@ -103,89 +105,95 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
 
   return (
     <View style={c.card}>
-      <View style={c.cardHeader}>
-        <Text style={c.cardDate}>{order.date}</Text>
-        <View style={c.typeBadge}><Text style={c.typeBadgeText}>{order.orderType.toUpperCase()}</Text></View>
+      <View style={c.orderBar}>
+        <Text style={c.orderBarLabel}>Order</Text>
+        <Text style={c.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
-      <Text style={c.cardName}>{order.name}</Text>
-      <Text style={c.totalTxt}>Paid Now: P {order.total}.00</Text>
+      <View style={c.cardInner}>
+        <View style={c.cardHeader}>
+          <Text style={c.cardDate}>{order.date}</Text>
+          <View style={c.typeBadge}><Text style={c.typeBadgeText}>{order.orderType.toUpperCase()}</Text></View>
+        </View>
+        <Text style={c.cardName}>{order.name}</Text>
+        <Text style={c.totalTxt}>Paid Now: P {order.total}.00</Text>
 
-      {remaining > 0 && (
-        order.paid ? (
-          <View style={c.paidBadge}>
-            <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
-            <Text style={c.paidBadgeText}>Balance Paid</Text>
-          </View>
-        ) : (
-          <Text style={c.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
-        )
-      )}
-
-      <TouchableOpacity style={c.dropToggle} onPress={() => setOpen(o => !o)}>
-        <Text style={c.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
-      </TouchableOpacity>
-
-      {open && (
-        <View>
-          {order.phone ? <View style={c.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.phone}</Text></View> : null}
-          {order.address ? <View style={c.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
-          {order.paymentMethod ? <View style={c.infoRow}><Ionicons name="card-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.paymentMethod === 'online' ? 'Pay Online' : 'Pay on Delivery'}</Text></View> : null}
-          {order.tip ? <View style={c.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[c.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
-          <View style={c.divider} />
-          {order.items?.map((item, i) => (
-            <View key={i}>
-              <View style={c.itemRow}>
-                <Text style={c.itemName}>{item.quantity}× {item.name}</Text>
-                <Text style={c.itemPrice}>P {item.price * item.quantity}.00</Text>
-              </View>
-              {item.cakeOrder && <CakeBlock cake={item.cakeOrder} />}
+        {remaining > 0 && (
+          order.paid ? (
+            <View style={c.paidBadge}>
+              <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
+              <Text style={c.paidBadgeText}>Balance Paid</Text>
             </View>
-          ))}
-          <View style={c.divider} />
-          <Text style={c.totalTxt}>Order Total: P {order.total}.00</Text>
-        </View>
-      )}
+          ) : (
+            <Text style={c.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
+          )
+        )}
 
-      {/* Actions */}
-      {role === 'live' && (
-        <View style={c.actionRow}>
-          <TouchableOpacity style={[c.actionBtn, order.status === 'preparing' && c.actionBtnActive]} onPress={markPreparing}>
-            <Text style={[c.actionBtnTxt, order.status === 'preparing' && c.actionBtnTxtActive]}>Preparing</Text>
-          </TouchableOpacity>
-          {order.status === 'preparing' && (order.orderType === 'pickup'
-            ? <TouchableOpacity style={c.actionBtn} onPress={markReadyPickup}><Text style={c.actionBtnTxt}>Ready for Pickup</Text></TouchableOpacity>
-            : <TouchableOpacity style={c.actionBtn} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>)}
-        </View>
-      )}
-
-      {role === 'ready' && (
-        <View style={c.actionRow}>
-          {!order.paid && remaining > 0 ? (
-            <TouchableOpacity style={c.actionBtn} onPress={markPaid}><Text style={c.actionBtnTxt}>Paid</Text></TouchableOpacity>
-          ) : null}
-          <TouchableOpacity
-            style={[c.actionBtn, (!order.paid && remaining > 0) && c.actionBtnDisabled]}
-            disabled={!order.paid && remaining > 0}
-            onPress={markCompleted}
-          ><Text style={c.actionBtnTxt}>Completed</Text></TouchableOpacity>
-        </View>
-      )}
-
-      {role === 'driver' && (
-        <View style={c.actionRow}>
-          <View style={[c.sentNote, { flex: 1 }]}>
-            <Ionicons name="car-outline" size={15} color="#3b82f6" />
-            <Text style={c.sentNoteTxt}>{order.driverStatus === 'on_the_way' ? 'On the way' : order.driverStatus === 'delivered' ? 'Delivered' : 'With driver'}</Text>
-          </View>
-        </View>
-      )}
-
-      {role === 'completed' && (
-        <TouchableOpacity style={c.deleteBtn} onPress={deleteOrder}>
-          <Ionicons name="trash-outline" size={16} color="#fff" /><Text style={c.deleteBtnTxt}>Delete Order</Text>
+        <TouchableOpacity style={c.dropToggle} onPress={() => setOpen(o => !o)}>
+          <Text style={c.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
         </TouchableOpacity>
-      )}
+
+        {open && (
+          <View>
+            {order.phone ? <View style={c.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.phone}</Text></View> : null}
+            {order.address ? <View style={c.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
+            {order.paymentMethod ? <View style={c.infoRow}><Ionicons name="card-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.paymentMethod === 'online' ? 'Pay Online' : 'Pay on Delivery'}</Text></View> : null}
+            {order.tip ? <View style={c.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[c.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
+            <View style={c.divider} />
+            {order.items?.map((item, i) => (
+              <View key={i}>
+                <View style={c.itemRow}>
+                  <Text style={c.itemName}>{item.quantity}× {item.name}</Text>
+                  <Text style={c.itemPrice}>P {item.price * item.quantity}.00</Text>
+                </View>
+                {item.cakeOrder && <CakeBlock cake={item.cakeOrder} />}
+              </View>
+            ))}
+            <View style={c.divider} />
+            <Text style={c.totalTxt}>Paid Now: P {order.total}.00</Text>
+          </View>
+        )}
+
+        {/* Actions */}
+        {role === 'live' && (
+          <View style={c.actionRow}>
+            <TouchableOpacity style={[c.actionBtn, order.status === 'preparing' && c.actionBtnActive]} onPress={markPreparing}>
+              <Text style={[c.actionBtnTxt, order.status === 'preparing' && c.actionBtnTxtActive]}>Preparing</Text>
+            </TouchableOpacity>
+            {order.status === 'preparing' && (order.orderType === 'pickup'
+              ? <TouchableOpacity style={c.actionBtn} onPress={markReadyPickup}><Text style={c.actionBtnTxt}>Ready for Pickup</Text></TouchableOpacity>
+              : <TouchableOpacity style={c.actionBtn} onPress={assignDriver}><Text style={c.actionBtnTxt}>Assign to Driver</Text></TouchableOpacity>)}
+          </View>
+        )}
+
+        {role === 'ready' && (
+          <View style={c.actionRow}>
+            {!order.paid && remaining > 0 ? (
+              <TouchableOpacity style={c.actionBtn} onPress={markPaid}><Text style={c.actionBtnTxt}>Paid</Text></TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[c.actionBtn, (!order.paid && remaining > 0) && c.actionBtnDisabled]}
+              disabled={!order.paid && remaining > 0}
+              onPress={markCompleted}
+            ><Text style={c.actionBtnTxt}>Completed</Text></TouchableOpacity>
+          </View>
+        )}
+
+        {role === 'driver' && (
+          <View style={c.actionRow}>
+            <View style={[c.sentNote, { flex: 1 }]}>
+              <Ionicons name="car-outline" size={15} color="#3b82f6" />
+              <Text style={c.sentNoteTxt}>{order.driverStatus === 'on_the_way' ? 'On the way' : order.driverStatus === 'delivered' ? 'Delivered' : 'With driver'}</Text>
+            </View>
+          </View>
+        )}
+
+        {role === 'completed' && (
+          <TouchableOpacity style={c.deleteBtn} onPress={deleteOrder}>
+            <Ionicons name="trash-outline" size={16} color="#fff" /><Text style={c.deleteBtnTxt}>Delete Order</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -194,6 +202,8 @@ export default function ManagerDashboard() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [tab, setTab] = useState<'live' | 'ready' | 'driver' | 'completed'>('live');
+  const todayLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const [dateFilter, setDateFilter] = useState<string>(todayLabel);
 
   useEffect(() => {
     (async () => {
@@ -224,6 +234,46 @@ export default function ManagerDashboard() {
   const driverOrders    = orders.filter(o => o.assignedToDriver && o.status !== 'completed');
   const completedOrders = orders.filter(o => o.status === 'completed');
 
+  const filteredCompleted = dateFilter
+    ? completedOrders.filter(o => o.date && (o.date.startsWith(dateFilter) || o.date.split(',')[0].trim() === dateFilter))
+    : completedOrders;
+
+  const generateSalesPDF = async () => {
+    const list = filteredCompleted;
+    if (!list.length) { Alert.alert('No Sales', 'There are no completed orders for this selection.'); return; }
+    const dateLabel = dateFilter || 'All Dates';
+    let grand = 0;
+    const rows = list.map(o => {
+      const dishes = (o.items || []).map((it: any) => it.name + (it.quantity > 1 ? ' x' + it.quantity : '')).join(', ');
+      const sale = o.total || 0;
+      grand += sale;
+      const num = o.orderNumber ? '#' + String(o.orderNumber).padStart(3, '0') : '-';
+      const type = o.orderType === 'delivery' ? 'Delivery' : 'Pickup';
+      return '<tr><td>' + num + '</td><td>' + type + '</td><td>' + dishes + '</td><td style="text-align:right">P ' + sale + '.00</td></tr>';
+    }).join('');
+    const html = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>'
+      + 'body{font-family:Helvetica,Arial,sans-serif;padding:24px;color:#1a1612;}'
+      + 'h1{color:#CE6F79;font-size:22px;margin:0 0 4px;}'
+      + '.sub{color:#666;font-size:13px;margin:0 0 18px;}'
+      + 'table{width:100%;border-collapse:collapse;font-size:13px;}'
+      + 'th{background:#CE6F79;color:#fff;text-align:left;padding:8px;}'
+      + 'td{padding:8px;border-bottom:1px solid #eee;}'
+      + 'tfoot td{font-weight:bold;border-top:2px solid #CE6F79;font-size:15px;}'
+      + '</style></head><body>'
+      + '<h1>Gourmet Fine Pastries - Sales Report</h1>'
+      + '<p class="sub">Date: ' + dateLabel + '  |  Orders: ' + list.length + '</p>'
+      + '<table><thead><tr><th>Order #</th><th>Type</th><th>Items</th><th style="text-align:right">Paid Now</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '<tfoot><tr><td colspan="3">Total</td><td style="text-align:right">P ' + grand + '.00</td></tr></tfoot>'
+      + '</table></body></html>';
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Sales Report' });
+    } catch (e) {
+      Alert.alert('Error', 'Could not generate the report.');
+    }
+  };
+
   const TABS: { key: typeof tab; label: string; count: number }[] = [
     { key: 'live',      label: 'Live Orders',   count: liveOrders.length },
     { key: 'ready',     label: 'Ready Pickups', count: readyOrders.length },
@@ -231,7 +281,7 @@ export default function ManagerDashboard() {
     { key: 'completed', label: 'Completed',     count: completedOrders.length },
   ];
 
-  const shown = tab === 'live' ? liveOrders : tab === 'ready' ? readyOrders : tab === 'driver' ? driverOrders : completedOrders;
+  const shown = tab === 'live' ? liveOrders : tab === 'ready' ? readyOrders : tab === 'driver' ? driverOrders : filteredCompleted;
 
   return (
     <View style={s.container}>
@@ -250,6 +300,31 @@ export default function ManagerDashboard() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {tab === 'completed' && (
+        <View style={s.dateFilterRow}>
+          <Text style={s.dateFilterLabel}>Filter:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
+            <TouchableOpacity style={[s.dateChip, dateFilter === todayLabel && s.dateChipActive]} onPress={() => setDateFilter(todayLabel)}>
+              <Text style={[s.dateChipTxt, dateFilter === todayLabel && s.dateChipTxtActive]}>Today - {todayLabel}</Text>
+            </TouchableOpacity>
+            {Array.from(new Set(completedOrders.map(o => (o.date || '').split(',')[0].trim()).filter(Boolean))).filter(d => d !== todayLabel).map(d => (
+              <TouchableOpacity key={d} style={[s.dateChip, dateFilter === d && s.dateChipActive]} onPress={() => setDateFilter(d)}>
+                <Text style={[s.dateChipTxt, dateFilter === d && s.dateChipTxtActive]}>{d}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[s.dateChip, dateFilter === '' && s.dateChipActive]} onPress={() => setDateFilter('')}>
+              <Text style={[s.dateChipTxt, dateFilter === '' && s.dateChipTxtActive]}>All</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
+      {tab === 'completed' && shown.length > 0 && (
+        <TouchableOpacity style={s.pdfBtn} onPress={generateSalesPDF}>
+          <Ionicons name="download-outline" size={18} color="#fff" />
+          <Text style={s.pdfBtnTxt}>Download Sales Report {dateFilter ? '(' + dateFilter + ')' : '(All)'}</Text>
+        </TouchableOpacity>
+      )}
 
       {shown.length === 0 ? (
         <View style={s.empty}>
@@ -277,12 +352,24 @@ const s = StyleSheet.create({
   tabCellTextActive:{ color: '#fff' },
   tabBadge:         { position: 'absolute', top: 8, right: 10, backgroundColor: '#C65C69', borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   tabBadgeText:     { fontSize: 10, fontWeight: '900', color: '#fff' },
+  dateFilterRow:    { backgroundColor: '#fff', paddingVertical: 10, paddingLeft: 16, borderBottomWidth: 1, borderBottomColor: PINK_LIGHT, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dateFilterLabel:  { fontSize: 12, fontWeight: '700', color: '#1a1612', flexShrink: 0 },
+  dateChip:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#f3f3f3', borderWidth: 1, borderColor: '#eee' },
+  dateChipActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
+  dateChipTxt:      { fontSize: 12, fontWeight: '700', color: '#6b6b6b' },
+  dateChipTxtActive:{ color: '#fff' },
+  pdfBtn:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PINK_DARK, marginHorizontal: 16, marginTop: 12, borderRadius: 12, paddingVertical: 13 },
+  pdfBtnTxt:        { fontSize: 14, fontWeight: '800', color: '#fff' },
   empty:            { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyTxt:         { fontSize: 16, fontWeight: '700', color: '#1a1612' },
 });
 
 const c = StyleSheet.create({
-  card:         { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, elevation: 2 },
+  card:         { backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, elevation: 2, overflow: 'hidden' },
+  orderBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 14, paddingVertical: 9 },
+  orderBarLabel:{ fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+  orderBarNum:  { fontSize: 22, fontWeight: '900', color: '#fff' },
+  cardInner:    { padding: 16 },
   cardHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   cardDate:     { fontSize: 12, color: '#6b6b6b' },
   typeBadge:    { backgroundColor: PINK_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
@@ -305,8 +392,8 @@ const c = StyleSheet.create({
   sumRow:       { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   sumLabel:     { fontSize: 12, color: '#6b6b6b', fontWeight: '600' },
   sumValue:     { fontSize: 12, color: '#1a1612', fontWeight: '700', flex: 1, textAlign: 'right', marginLeft: 12 },
-  actionRow:    { flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' },
-  actionBtn:    { flex: 1, minWidth: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_DARK, borderRadius: 12, paddingVertical: 12 },
+  actionRow:    { flexDirection: 'row', gap: 10, marginTop: 12, flexWrap: 'wrap' },
+  actionBtn:    { flex: 1, minWidth: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fff', borderWidth: 2, borderColor: PINK_MID, borderRadius: 12, paddingVertical: 14 },
   actionBtnActive: { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   actionBtnDisabled: { opacity: 0.4 },
   actionBtnTxt: { fontSize: 13, fontWeight: '800', color: PINK_DARK },

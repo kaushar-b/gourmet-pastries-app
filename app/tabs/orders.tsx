@@ -20,7 +20,7 @@ function fmtHour(h: any) {
 }
 
 type Order = {
-  id: string; date: string; orderType: 'pickup' | 'delivery';
+  id: string; orderNumber?: number | null; date: string; orderType: 'pickup' | 'delivery';
   status: string; driverStatus?: string | null;
   items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
   total: number; cakeRemaining?: number; paid?: boolean;
@@ -53,8 +53,8 @@ function CakeBlock({ cake }: { cake: any }) {
       <Row l="Time" v={fmtHour(cake.hour)} />
       {cake.tip ? <Row l="Driver Tip" v={`P ${cake.tip}.00`} /> : null}
       <Row l="Total" v={`P ${cake.total}.00`} />
-      <Row l="Total Incl VAT" v={`P ${cake.total + Math.round(cake.total * VAT_RATE)}.00`} />
-      <Row l="Deposit Paid (50% + Full VAT)" v={`P ${cake.deposit + Math.round(cake.total * VAT_RATE)}.00`} />
+      <Row l="VAT incl. (14%)" v={`P ${Math.round(cake.total - cake.total / (1 + VAT_RATE))}.00`} />
+      <Row l="Deposit Paid (50%)" v={`P ${cake.deposit}.00`} />
     </View>
   );
 }
@@ -68,63 +68,69 @@ function OrderRow({ order }: { order: Order }) {
 
   return (
     <View style={s.card}>
-      {/* Collapsed header: name + status */}
-      <View style={s.cardTop}>
-        <View style={s.cardTopLeft}>
-          <Text style={s.cakeTitle}>{cakeNames}</Text>
-        </View>
-        <View style={[s.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
-          <Ionicons name={icon as any} size={13} color={color} />
-          <Text style={[s.statusText, { color }]}>{label}</Text>
-        </View>
+      <View style={s.orderBar}>
+        <Text style={s.orderBarLabel}>Order</Text>
+        <Text style={s.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
-
-      {/* Collapsed: remaining balance (red) or paid (green) */}
-      {remaining > 0 && (
-        order.paid ? (
-          <View style={[s.balancePill, s.balancePillNarrow, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
-            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-            <Text style={[s.balanceText, { color: '#22c55e' }]}>Paid</Text>
+      <View style={s.cardInner}>
+        {/* Collapsed header: name + status */}
+        <View style={s.cardTop}>
+          <View style={s.cardTopLeft}>
+            <Text style={s.cakeTitle}>{cakeNames}</Text>
           </View>
-        ) : (
-          <View style={[s.balancePill, { backgroundColor: '#C65C6922', borderColor: '#C65C69' }]}>
-            <Ionicons name="alert-circle" size={16} color="#C65C69" />
-            <Text style={[s.balanceText, { color: '#C65C69' }]}>Remaining to be Paid: P {remaining}.00</Text>
+          <View style={[s.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
+            <Ionicons name={icon as any} size={13} color={color} />
+            <Text style={[s.statusText, { color }]}>{label}</Text>
           </View>
-        )
-      )}
-
-      {/* Dropdown toggle */}
-      <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
-        <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
-      </TouchableOpacity>
-
-      {/* Expanded: full summary */}
-      {open && (
-        <View>
-          <View style={s.divider} />
-          <View style={s.itemRow}>
-            <Text style={s.itemName}>{order.date}</Text>
-            <Text style={s.itemPrice}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
-          </View>
-          <View style={s.divider} />
-
-          {order.items?.filter(i => i.cakeOrder).map((i, idx) => <CakeBlock key={idx} cake={i.cakeOrder} />)}
-
-          <View style={s.divider} />
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Paid Now</Text>
-            <Text style={s.totalVal}>P {order.total}.00</Text>
-          </View>
-          {remaining > 0 && (
-            <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Remaining {order.orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text>
-              <Text style={s.totalVal}>P {remaining}.00</Text>
-            </View>
-          )}
         </View>
-      )}
+
+        {/* Collapsed: remaining balance (red) or paid (green) */}
+        {remaining > 0 && (
+          order.paid ? (
+            <View style={[s.balancePill, s.balancePillNarrow, { backgroundColor: '#22c55e22', borderColor: '#22c55e' }]}>
+              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+              <Text style={[s.balanceText, { color: '#22c55e' }]}>Paid</Text>
+            </View>
+          ) : (
+            <View style={[s.balancePill, { backgroundColor: '#C65C6922', borderColor: '#C65C69' }]}>
+              <Ionicons name="alert-circle" size={16} color="#C65C69" />
+              <Text style={[s.balanceText, { color: '#C65C69' }]}>Remaining to be Paid: P {remaining}.00</Text>
+            </View>
+          )
+        )}
+
+        {/* Dropdown toggle */}
+        <TouchableOpacity style={s.dropToggle} onPress={() => setOpen(o => !o)}>
+          <Text style={s.dropToggleText}>{open ? 'Hide' : 'View'} order details</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={PINK_DARK} />
+        </TouchableOpacity>
+
+        {/* Expanded: full summary */}
+        {open && (
+          <View>
+            <View style={s.divider} />
+            <View style={s.itemRow}>
+              <Text style={s.itemName}>{order.date}</Text>
+              <Text style={s.itemPrice}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
+            </View>
+            <View style={s.divider} />
+
+            {order.items?.filter(i => i.cakeOrder).map((i, idx) => <CakeBlock key={idx} cake={i.cakeOrder} />)}
+
+            <View style={s.divider} />
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Paid Now</Text>
+              <Text style={s.totalVal}>P {order.total}.00</Text>
+            </View>
+            {remaining > 0 && (
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Remaining {order.orderType === 'delivery' ? '(on delivery)' : '(on collection)'}</Text>
+                <Text style={s.totalVal}>P {remaining}.00</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -189,7 +195,11 @@ const s = StyleSheet.create({
   emptyText:    { fontSize: 17, fontWeight: '700', color: '#6b6b6b' },
   shopBtn:      { backgroundColor: PINK_DARK, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 },
   shopBtnText:  { fontSize: 15, fontWeight: '700', color: '#fff' },
-  card:         { backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 16, elevation: 2 },
+  card:         { backgroundColor: '#fff', borderRadius: 18, marginBottom: 16, elevation: 2, overflow: 'hidden' },
+  orderBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 16, paddingVertical: 9 },
+  orderBarLabel:{ fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+  orderBarNum:  { fontSize: 22, fontWeight: '900', color: '#fff' },
+  cardInner:    { padding: 16 },
   cardTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   cardTopLeft:  { gap: 2, flex: 1, paddingRight: 10 },
   cakeTitle:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
@@ -215,5 +225,3 @@ const s = StyleSheet.create({
   balanceText:  { fontSize: 14, fontWeight: '800' },
   balancePillNarrow: { alignSelf: 'flex-start' },
 });
-
-
