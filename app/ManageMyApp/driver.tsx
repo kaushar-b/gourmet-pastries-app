@@ -25,10 +25,20 @@ type Order = {
   orderType: 'pickup' | 'delivery'; address?: string; address2?: string;
   paymentMethod?: string | null; tip?: number;
   items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
-  total: number; cakeRemaining?: number; paid?: boolean;
+  subtotal?: number; total: number; cakeRemaining?: number; paid?: boolean;
   status: string; driverStatus: string | null;
   customerPushToken?: string | null; createdAt: number;
 };
+
+function PayTag({ order }: { order: Order }) {
+  const online = order.paymentMethod === 'online' || order.orderType === 'pickup';
+  return (
+    <View style={[s.payTag, online ? s.payTagOnline : s.payTagCod]}>
+      {online && <Ionicons name="checkmark-circle" size={13} color="#fff" />}
+      <Text style={s.payTagTxt}>{online ? 'Paid Online' : 'Pay on Delivery'}</Text>
+    </View>
+  );
+}
 
 function CakeBlock({ cake }: { cake: any }) {
   const Row = ({ l, v }: { l: string; v: string }) => (
@@ -55,12 +65,12 @@ function CakeBlock({ cake }: { cake: any }) {
 function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'completed'; onPaid: () => void }) {
   const [open, setOpen] = useState(false);
   const remaining = order.cakeRemaining ?? 0;
+  const fullPrice = order.subtotal ?? order.total;
   const notify = (title: string, body: string) => {
     if (order.customerPushToken) sendPushNotification(order.customerPushToken, title, body, CHANNELS.CUSTOMER);
   };
   const markOnTheWay = async () => {
     await update(ref(db, `orders/${order.id}`), { driverStatus: 'on_the_way' });
-    notify('On the Way!', 'Your order is on its way to you!');
   };
   const markDelivered = async () => {
     await update(ref(db, `orders/${order.id}`), { driverStatus: 'delivered' });
@@ -80,16 +90,18 @@ function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'compl
         <Text style={s.orderBarLabel}>Order</Text>
         <Text style={s.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
+      <View style={s.payTagWrap}><PayTag order={order} /></View>
       <View style={s.cardInner}>
         <View style={s.cardHeader}>
           <Text style={s.cardDate}>{order.date}</Text>
           <View style={s.typeBadge}><Text style={s.typeBadgeText}>{order.orderType.toUpperCase()}</Text></View>
         </View>
         <Text style={s.cardName}>{order.name}</Text>
-        <Text style={s.totalTxt}>Total: P {order.total}.00</Text>
+        <Text style={s.totalTxt}>Paid Now: P {order.total}.00</Text>
+        <Text style={s.fullPriceTxt}>Full Price: P {fullPrice}.00</Text>
         {remaining > 0 && (
           order.paid
-            ? <View style={s.paidBadge}><Ionicons name="checkmark-circle" size={15} color="#22c55e" /><Text style={s.paidBadgeText}>Balance Paid</Text></View>
+            ? <View style={s.paidBadge}><Ionicons name="checkmark-circle" size={20} color="#22c55e" /><Text style={s.paidBadgeText}>BALANCE PAID</Text></View>
             : <Text style={s.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
         )}
 
@@ -100,7 +112,7 @@ function DriverCard({ order, tab, onPaid }: { order: Order; tab: 'live' | 'compl
 
         {open && (
           <View>
-            {order.phone ? <View style={s.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.phone}</Text></View> : null}
+            {order.phone ? <View style={s.infoRow}><Ionicons name="call-outline" size={17} color="#6b6b6b" /><Text style={s.phoneTxt}>{order.phone}</Text></View> : null}
             {order.address ? <View style={s.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={s.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
             {order.tip ? <View style={s.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[s.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
             <View style={s.divider} />
@@ -243,20 +255,27 @@ const s = StyleSheet.create({
   orderBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 14, paddingVertical: 9 },
   orderBarLabel:    { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
   orderBarNum:      { fontSize: 22, fontWeight: '900', color: '#fff' },
-  cardInner:        { padding: 16 },
+  payTagWrap:       { alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10 },
+  payTag:           { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  payTagOnline:     { backgroundColor: '#22c55e' },
+  payTagCod:        { backgroundColor: '#9a8f8f' },
+  payTagTxt:        { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 0.3 },
+  cardInner:        { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 6 },
   cardHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardDate:         { fontSize: 12, color: '#6b6b6b' },
+  cardDate:         { fontSize: 15, fontWeight: '700', color: '#1a1612' },
   typeBadge:        { backgroundColor: PINK_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   typeBadgeText:    { fontSize: 10, fontWeight: '900', color: PINK_DARK },
   cardName:         { fontSize: 16, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   totalTxt:         { fontSize: 15, fontWeight: '800', color: PINK_DARK, marginTop: 4 },
+  fullPriceTxt:     { fontSize: 14, fontWeight: '700', color: '#6b6b6b', marginTop: 2 },
   balanceTxt:       { fontSize: 13, fontWeight: '800', color: '#dc2626', marginTop: 6 },
-  paidBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  paidBadgeText:    { fontSize: 13, fontWeight: '800', color: '#22c55e' },
+  paidBadge:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  paidBadgeText:    { fontSize: 16, fontWeight: '900', color: '#22c55e', letterSpacing: 0.5 },
   dropToggle:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: PINK_LIGHT },
   dropToggleText:   { fontSize: 13, fontWeight: '700', color: PINK_DARK },
   infoRow:          { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   infoTxt:          { fontSize: 13, color: '#6b6b6b' },
+  phoneTxt:         { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   divider:          { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 10 },
   itemRow:          { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   itemName:         { fontSize: 13, color: '#1a1612' },

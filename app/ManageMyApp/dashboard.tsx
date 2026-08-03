@@ -13,6 +13,7 @@ import { registerForPushToken, sendPushNotification, CHANNELS } from '../../lib/
 const PINK_DARK  = '#CE6F79';
 const PINK_LIGHT = '#FADAD9';
 const PINK_MID   = '#E9ABAE';
+const YELLOW     = '#FFD544';
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtDate(d: any) { return d ? `${d.day} ${MONTH_NAMES[d.month]} ${d.year}` : '—'; }
@@ -32,6 +33,16 @@ type Order = {
   driverStatus?: string | null; customerPushToken?: string | null;
   userId?: string; createdAt: number;
 };
+
+function PayTag({ order }: { order: Order }) {
+  const online = order.paymentMethod === 'online' || order.orderType === 'pickup';
+  return (
+    <View style={[c.payTag, online ? c.payTagOnline : c.payTagCod]}>
+      {online && <Ionicons name="checkmark-circle" size={13} color="#fff" />}
+      <Text style={c.payTagTxt}>{online ? 'Paid Online' : 'Pay on Delivery'}</Text>
+    </View>
+  );
+}
 
 function CakeBlock({ cake }: { cake: any }) {
   const Row = ({ l, v }: { l: string; v: string }) => (
@@ -60,6 +71,7 @@ function CakeBlock({ cake }: { cake: any }) {
 function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'driver' | 'completed' }) {
   const [open, setOpen] = useState(false);
   const remaining = order.cakeRemaining ?? 0;
+  const fullPrice = order.subtotal ?? order.total;
 
   const notifyCustomer = (title: string, body: string) => {
     if (order.customerPushToken) sendPushNotification(order.customerPushToken, title, body, CHANNELS.CUSTOMER);
@@ -67,7 +79,6 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
 
   const markPreparing = async () => {
     await update(ref(db, `orders/${order.id}`), { status: 'preparing' });
-    notifyCustomer('Order Update', 'Your order is being prepared!');
   };
   const markReadyPickup = async () => {
     await update(ref(db, `orders/${order.id}`), { status: 'ready' });
@@ -109,6 +120,7 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
         <Text style={c.orderBarLabel}>Order</Text>
         <Text style={c.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
+      <View style={c.payTagWrap}><PayTag order={order} /></View>
       <View style={c.cardInner}>
         <View style={c.cardHeader}>
           <Text style={c.cardDate}>{order.date}</Text>
@@ -116,12 +128,13 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
         </View>
         <Text style={c.cardName}>{order.name}</Text>
         <Text style={c.totalTxt}>Paid Now: P {order.total}.00</Text>
+        <Text style={c.fullPriceTxt}>Full Price: P {fullPrice}.00</Text>
 
         {remaining > 0 && (
           order.paid ? (
             <View style={c.paidBadge}>
-              <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
-              <Text style={c.paidBadgeText}>Balance Paid</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+              <Text style={c.paidBadgeText}>BALANCE PAID</Text>
             </View>
           ) : (
             <Text style={c.balanceTxt}>Remaining Balance: P {remaining}.00</Text>
@@ -135,9 +148,9 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
 
         {open && (
           <View>
-            {order.phone ? <View style={c.infoRow}><Ionicons name="call-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.phone}</Text></View> : null}
+            {order.phone ? <View style={c.infoRow}><Ionicons name="call-outline" size={17} color="#6b6b6b" /><Text style={c.phoneTxt}>{order.phone}</Text></View> : null}
             {order.address ? <View style={c.infoRow}><Ionicons name="location-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.address}{order.address2 ? `, ${order.address2}` : ''}</Text></View> : null}
-            {order.paymentMethod ? <View style={c.infoRow}><Ionicons name="card-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.paymentMethod === 'online' ? 'Pay Online' : 'Pay on Delivery'}</Text></View> : null}
+            {order.paymentMethod ? <View style={c.infoRow}><Ionicons name="card-outline" size={14} color="#6b6b6b" /><Text style={c.infoTxt}>{order.paymentMethod === 'online' ? 'Paid Online' : 'Pay on Delivery'}</Text></View> : null}
             {order.tip ? <View style={c.infoRow}><Ionicons name="gift-outline" size={14} color={PINK_DARK} /><Text style={[c.infoTxt, { color: PINK_DARK, fontWeight: '800' }]}>Driver Tip: P{order.tip}.00</Text></View> : null}
             <View style={c.divider} />
             {order.items?.map((item, i) => (
@@ -151,6 +164,7 @@ function OrderCard({ order, role }: { order: Order; role: 'live' | 'ready' | 'dr
             ))}
             <View style={c.divider} />
             <Text style={c.totalTxt}>Paid Now: P {order.total}.00</Text>
+            <Text style={c.fullPriceTxt}>Full Price: P {fullPrice}.00</Text>
           </View>
         )}
 
@@ -244,27 +258,32 @@ export default function ManagerDashboard() {
     const dateLabel = dateFilter || 'All Dates';
     let grand = 0;
     const rows = list.map(o => {
-      const dishes = (o.items || []).map((it: any) => it.name + (it.quantity > 1 ? ' x' + it.quantity : '')).join(', ');
-      const sale = o.total || 0;
-      grand += sale;
+      const itemsHtml = (o.items || []).map((it: any) => it.name + (it.quantity > 1 ? ' x' + it.quantity : '')).join('<br>');
+      const full = o.subtotal ?? o.total ?? 0;
+      const deposit = o.total ?? 0;
+      grand += full;
       const num = o.orderNumber ? '#' + String(o.orderNumber).padStart(3, '0') : '-';
       const type = o.orderType === 'delivery' ? 'Delivery' : 'Pickup';
-      return '<tr><td>' + num + '</td><td>' + type + '</td><td>' + dishes + '</td><td style="text-align:right">P ' + sale + '.00</td></tr>';
+      const online = o.paymentMethod === 'online' || o.orderType === 'pickup';
+      const box = online ? '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #1a1612;text-align:center;line-height:14px;">&#10003;</span>' : '<span style="display:inline-block;width:14px;height:14px;border:1.5px solid #1a1612;"></span>';
+      return '<tr><td style="text-align:center">' + box + '</td><td>' + num + '</td><td>' + type + '</td><td>' + itemsHtml + '</td><td style="text-align:right">P ' + deposit + '.00</td><td style="text-align:right">P ' + full + '.00</td></tr>';
     }).join('');
     const html = '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>'
       + 'body{font-family:Helvetica,Arial,sans-serif;padding:24px;color:#1a1612;}'
       + 'h1{color:#CE6F79;font-size:22px;margin:0 0 4px;}'
-      + '.sub{color:#666;font-size:13px;margin:0 0 18px;}'
+      + '.sub{color:#666;font-size:13px;margin:0 0 6px;}'
+      + '.key{color:#1a1612;font-size:12px;margin:0 0 16px;font-weight:bold;}'
       + 'table{width:100%;border-collapse:collapse;font-size:13px;}'
       + 'th{background:#CE6F79;color:#fff;text-align:left;padding:8px;}'
-      + 'td{padding:8px;border-bottom:1px solid #eee;}'
+      + 'td{padding:8px;border-bottom:1px solid #eee;vertical-align:top;}'
       + 'tfoot td{font-weight:bold;border-top:2px solid #CE6F79;font-size:15px;}'
       + '</style></head><body>'
       + '<h1>Gourmet Fine Pastries - Sales Report</h1>'
       + '<p class="sub">Date: ' + dateLabel + '  |  Orders: ' + list.length + '</p>'
-      + '<table><thead><tr><th>Order #</th><th>Type</th><th>Items</th><th style="text-align:right">Paid Now</th></tr></thead>'
+      + '<p class="key">KEY: Ticked boxes indicate "Paid Online" orders.</p>'
+      + '<table><thead><tr><th></th><th>Order #</th><th>Type</th><th>Items</th><th style="text-align:right">50% Deposit</th><th style="text-align:right">Full Price</th></tr></thead>'
       + '<tbody>' + rows + '</tbody>'
-      + '<tfoot><tr><td colspan="3">Total</td><td style="text-align:right">P ' + grand + '.00</td></tr></tfoot>'
+      + '<tfoot><tr><td colspan="5">Total (Full Price)</td><td style="text-align:right">P ' + grand + '.00</td></tr></tfoot>'
       + '</table></body></html>';
     try {
       const { uri } = await Print.printToFileAsync({ html });
@@ -321,7 +340,7 @@ export default function ManagerDashboard() {
       )}
       {tab === 'completed' && shown.length > 0 && (
         <TouchableOpacity style={s.pdfBtn} onPress={generateSalesPDF}>
-          <Ionicons name="download-outline" size={18} color="#fff" />
+          <Ionicons name="download-outline" size={18} color="#1a1612" />
           <Text style={s.pdfBtnTxt}>Download Sales Report {dateFilter ? '(' + dateFilter + ')' : '(All)'}</Text>
         </TouchableOpacity>
       )}
@@ -358,8 +377,8 @@ const s = StyleSheet.create({
   dateChipActive:   { backgroundColor: PINK_DARK, borderColor: PINK_DARK },
   dateChipTxt:      { fontSize: 12, fontWeight: '700', color: '#6b6b6b' },
   dateChipTxtActive:{ color: '#fff' },
-  pdfBtn:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: PINK_DARK, marginHorizontal: 16, marginTop: 12, borderRadius: 12, paddingVertical: 13 },
-  pdfBtnTxt:        { fontSize: 14, fontWeight: '800', color: '#fff' },
+  pdfBtn:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: YELLOW, marginHorizontal: 16, marginTop: 12, borderRadius: 12, paddingVertical: 13 },
+  pdfBtnTxt:        { fontSize: 14, fontWeight: '800', color: '#1a1612' },
   empty:            { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyTxt:         { fontSize: 16, fontWeight: '700', color: '#1a1612' },
 });
@@ -369,20 +388,27 @@ const c = StyleSheet.create({
   orderBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 14, paddingVertical: 9 },
   orderBarLabel:{ fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
   orderBarNum:  { fontSize: 22, fontWeight: '900', color: '#fff' },
-  cardInner:    { padding: 16 },
+  payTagWrap:   { alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10 },
+  payTag:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  payTagOnline: { backgroundColor: '#22c55e' },
+  payTagCod:    { backgroundColor: '#9a8f8f' },
+  payTagTxt:    { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 0.3 },
+  cardInner:    { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 6 },
   cardHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardDate:     { fontSize: 12, color: '#6b6b6b' },
+  cardDate:     { fontSize: 15, fontWeight: '700', color: '#1a1612' },
   typeBadge:    { backgroundColor: PINK_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   typeBadgeText:{ fontSize: 10, fontWeight: '900', color: PINK_DARK },
   cardName:     { fontSize: 16, fontWeight: '800', color: '#1a1612', marginBottom: 4 },
   totalTxt:     { fontSize: 15, fontWeight: '800', color: PINK_DARK, marginTop: 4 },
+  fullPriceTxt: { fontSize: 14, fontWeight: '700', color: '#6b6b6b', marginTop: 2 },
   balanceTxt:   { fontSize: 13, fontWeight: '800', color: '#dc2626', marginTop: 6 },
-  paidBadge:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  paidBadgeText:{ fontSize: 13, fontWeight: '800', color: '#22c55e' },
+  paidBadge:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  paidBadgeText:{ fontSize: 16, fontWeight: '900', color: '#22c55e', letterSpacing: 0.5 },
   dropToggle:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: PINK_LIGHT },
   dropToggleText:{ fontSize: 13, fontWeight: '700', color: PINK_DARK },
   infoRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   infoTxt:      { fontSize: 13, color: '#6b6b6b' },
+  phoneTxt:     { fontSize: 16, fontWeight: '800', color: '#1a1612' },
   divider:      { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 10 },
   itemRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   itemName:     { fontSize: 13, color: '#1a1612' },

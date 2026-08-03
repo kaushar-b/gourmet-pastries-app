@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCart } from '../../context/CartContext';
@@ -39,8 +39,8 @@ export default function Cart() {
   const tips          = cakeItems.reduce((s, i) => s + (i.cakeOrder?.tip ?? 0), 0);
 
   const subtotal  = menuFull + cakeFull;
-  const vatAmount = Math.round(subtotal * VAT_RATE);
-  const dueNow    = menuFull + cakeDeposit + vatAmount + tips;
+  const vatAmount = Math.round(subtotal - subtotal / (1 + VAT_RATE));
+  const dueNow    = menuFull + cakeDeposit + tips;
 
   if (items.length === 0) {
     return (
@@ -77,7 +77,11 @@ export default function Cart() {
             <View key={item.id} style={s.card}>
               <View style={s.cardTopRow}>
                 <View style={s.cardIconWrap}>
-                  <Ionicons name={(item.icon as any) || 'gift'} size={26} color={PINK_DARK} />
+                  {item.image ? (
+                    <Image source={item.image} style={s.cardImg} resizeMode="cover" />
+                  ) : (
+                    <Ionicons name={(item.icon as any) || 'gift'} size={26} color={PINK_DARK} />
+                  )}
                 </View>
                 <View style={s.cardBody}>
                   <Text style={s.cardName}>{item.name}</Text>
@@ -98,7 +102,7 @@ export default function Cart() {
                     <Ionicons name="remove" size={16} color="#1a1612" />
                   </TouchableOpacity>
                   <Text style={s.qtyText}>{item.quantity}</Text>
-                  <TouchableOpacity style={s.qtyBtn} onPress={() => addToCart(item.id, { id: item.id, name: item.name, price: item.price, icon: item.icon })}>
+                  <TouchableOpacity style={s.qtyBtn} onPress={() => addToCart(item.id, { id: item.id, name: item.name, price: item.price, icon: item.icon, image: item.image })}>
                     <Ionicons name="add" size={16} color="#1a1612" />
                   </TouchableOpacity>
                 </View>
@@ -149,7 +153,7 @@ export default function Cart() {
       <View style={s.footer}>
         <View style={s.totalsBox}>
           <View style={s.totalRow}><Text style={s.totalLabel}>Subtotal</Text><Text style={s.totalVal}>P {subtotal}.00</Text></View>
-          <View style={s.totalRow}><Text style={s.totalLabel}>VAT (14%)</Text><Text style={s.totalVal}>P {vatAmount}.00</Text></View>
+          <View style={s.totalRow}><Text style={s.totalLabel}>VAT incl. (14%)</Text><Text style={s.totalVal}>P {vatAmount}.00</Text></View>
           {tips > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Driver Tip</Text><Text style={s.totalVal}>P {tips}.00</Text></View>}
           {cakeRemaining > 0 && (
             <View style={s.totalRow}><Text style={s.totalLabel}>Cake balance (on collection)</Text><Text style={s.totalVal}>P {cakeRemaining}.00</Text></View>
@@ -186,7 +190,8 @@ const s = StyleSheet.create({
   shopBtnText:   { fontSize: 15, fontWeight: '700', color: '#fff' },
   card:          { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12, elevation: 1 },
   cardTopRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardIconWrap:  { width: 52, height: 52, borderRadius: 12, backgroundColor: PINK_LIGHT, alignItems: 'center', justifyContent: 'center' },
+  cardIconWrap:  { width: 52, height: 52, borderRadius: 12, backgroundColor: PINK_LIGHT, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  cardImg:       { width: '100%', height: '100%' },
   cardBody:      { flex: 1 },
   cardName:      { fontSize: 15, fontWeight: '700', color: '#1a1612', marginBottom: 2 },
   cakeTag:       { fontSize: 11, color: PINK_DARK, fontWeight: '700', marginBottom: 2 },

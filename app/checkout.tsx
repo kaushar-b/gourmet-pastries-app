@@ -27,8 +27,8 @@ export default function Checkout() {
   const [placing, setPlacing]         = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
-  // Cake items (have cakeOrder): charged 50% deposit now, 50% remaining on collection.
-  // Regular items (no cakeOrder): charged 100% now.
+  // Cake items (have cakeOrder): 50% deposit now, 50% remaining on collection.
+  // Regular items (no cakeOrder): 100% now.
   const cakeFull    = items.reduce((sm, i) => sm + (i.cakeOrder ? (i.cakeOrder.total ?? 0) : 0), 0);
   const regularFull = items.reduce((sm, i) => sm + (i.cakeOrder ? 0 : (i.price ?? 0) * (i.quantity ?? 1)), 0);
   const orderTotal  = cakeFull + regularFull;
@@ -38,14 +38,20 @@ export default function Checkout() {
   const vatAmount     = Math.round(orderTotal - orderTotal / (1 + VAT_RATE));
   const grandTotal    = cakeDeposit + regularFull + tip;
 
+  const hasCake = cakeFull > 0;
+  // Pickup is always paid online. Delivery uses the chosen method.
+  const effectivePayment: 'online' | 'cod' = orderType === 'pickup' ? 'online' : (paymentMethod ?? 'cod');
+
   const validate = () => {
     const e: Record<string, string> = {};
     const missing: string[] = [];
     if (!orderType) { e.orderType = 'Please select Pickup or Delivery'; missing.push('Select Pickup or Delivery'); }
+    if (orderType === 'delivery' && !paymentMethod) { e.paymentMethod = 'Please select a payment method'; missing.push('Choose Pay Online or Pay on Delivery'); }
     if (!name.trim()) { e.name = 'Full name is required'; missing.push('Enter your full name'); }
     if (!phone.trim()) { e.phone = 'Phone number is required'; missing.push('Enter your phone number'); }
     else if (phone.trim().length !== 8) { e.phone = 'Phone number must be 8 digits'; missing.push('Enter a valid 8-digit phone number'); }
-    if (orderType === 'delivery' && !address1.trim()) { e.address1 = 'Address is required'; missing.push('Enter your delivery address'); }
+    if (orderType === 'delivery' && !address1.trim()) { e.address1 = 'Street / House number is required'; missing.push('Enter your street / house number'); }
+    if (orderType === 'delivery' && !address2.trim()) { e.address2 = 'Area / Suburb is required'; missing.push('Enter your area / suburb'); }
     setErrors(e);
     if (missing.length > 0) {
       Alert.alert('Almost there!', 'Please complete the following:\n\n\u2022 ' + missing.join('\n\u2022 '));
@@ -71,14 +77,17 @@ export default function Checkout() {
       }
 
       const enrichedItems = items.map(i => {
-        if (!i.cakeOrder) return { name: i.name, price: i.price, quantity: i.quantity, cakeOrder: null };
+        if (!i.cakeOrder) return { name: i.name, price: i.price, quantity: i.quantity, image: i.image ?? null, cakeOrder: null };
         const t = i.cakeOrder.total ?? 0;
         const dep = Math.round(t * 0.5);
         return {
-          name: i.name, price: i.price, quantity: i.quantity,
+          name: i.name, price: i.price, quantity: i.quantity, image: i.image ?? null,
           cakeOrder: { ...i.cakeOrder, total: t, deposit: dep, remaining: t - dep, orderType, tip },
         };
       });
+
+      // Auto-PAID only when: no custom cake in the order AND paid online.
+      const paidInFull = !hasCake && effectivePayment === 'online';
 
       const orderData = {
         orderNumber,
@@ -87,7 +96,7 @@ export default function Checkout() {
         orderType,
         address: address1.trim(),
         address2: address2.trim(),
-        paymentMethod,
+        paymentMethod: effectivePayment,
         tip,
         items: enrichedItems,
         subtotal: orderTotal,
@@ -98,7 +107,7 @@ export default function Checkout() {
         status: 'received',
         assignedToDriver: false,
         driverStatus: null,
-        paid: false,
+        paid: paidInFull,
         userId: user?.uid ?? null,
         customerPushToken: customerToken,
         date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -161,8 +170,6 @@ export default function Checkout() {
     );
   }
 
-  const hasCake = cakeFull > 0;
-
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.container}>
@@ -198,20 +205,18 @@ export default function Checkout() {
 
           {orderType === 'delivery' && (
             <>
-              <Text style={s.sectionLabel}>Driver Tip</Text>
-              <View style={s.tipRow}>
-                {[0, 5, 10, 20].map(amt => (
-                  <TouchableOpacity key={amt} style={[s.tipBtn, tip === amt && s.tipBtnActive]} onPress={() => setTip(amt)}>
-                    {amt === 0 ? <Ionicons name="remove-circle-outline" size={20} color={tip === 0 ? '#fff' : PINK_DARK} /> : <Text style={[s.tipBtnText, tip === amt && s.tipBtnTextActive]}>P{amt}</Text>}
-                  </TouchableOpacity>
-                ))}
+              <Text style={s.sectionLabel}>Payment Method</Text>
+              {errors.paymentMethod ? <Text style={s.errTxt}>{errors.paymentMethod}</Text> : null}
+              <View style={s.toggleRow}>
+                <TouchableOpacity style={[s.toggleBtn, paymentMethod === 'online' && s.toggleActive]} onPress={() => setPaymentMethod('online')}>
+                  <Ionicons name="card" size={22} color={paymentMethod === 'online' ? '#fff' : PINK_DARK} />
+                  <Text style={[s.toggleTitle, paymentMethod === 'online' && s.toggleTitleActive]}>Pay Online</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.toggleBtn, paymentMethod === 'cod' && s.toggleActive]} onPress={() => setPaymentMethod('cod')}>
+                  <Ionicons name="cash" size={22} color={paymentMethod === 'cod' ? '#fff' : PINK_DARK} />
+                  <Text style={[s.toggleTitle, paymentMethod === 'cod' && s.toggleTitleActive]}>Pay on Delivery</Text>
+                </TouchableOpacity>
               </View>
-
-              <Text style={s.sectionLabel}>Delivery Address</Text>
-              {errors.address1 ? <Text style={s.errTxt}>{errors.address1}</Text> : null}
-              <TextInput style={s.input} placeholder="Street / House number" placeholderTextColor="#b58a8d" value={address1} onChangeText={setAddress1} />
-              <TextInput style={s.input} placeholder="Area / Suburb" placeholderTextColor="#b58a8d" value={address2} onChangeText={setAddress2} />
-              <TextInput style={[s.input, s.inputFixed]} value="Phakalane" editable={false} />
             </>
           )}
 
@@ -223,6 +228,26 @@ export default function Checkout() {
             <View style={s.phonePrefix}><Text style={s.phoneFlag}>🇧🇼</Text><Text style={s.phonePrefixText}>+267</Text></View>
             <TextInput style={s.phoneInput} placeholder="71234567" placeholderTextColor="#b58a8d" value={phone} onChangeText={t => setPhone(t.replace(/[^0-9]/g, '').slice(0, 8))} keyboardType="number-pad" maxLength={8} />
           </View>
+
+          {orderType === 'delivery' && (
+            <>
+              <Text style={s.sectionLabel}>Delivery Address</Text>
+              {errors.address1 ? <Text style={s.errTxt}>{errors.address1}</Text> : null}
+              <TextInput style={s.input} placeholder="Street / House number" placeholderTextColor="#b58a8d" value={address1} onChangeText={setAddress1} />
+              {errors.address2 ? <Text style={s.errTxt}>{errors.address2}</Text> : null}
+              <TextInput style={s.input} placeholder="Area / Suburb" placeholderTextColor="#b58a8d" value={address2} onChangeText={setAddress2} />
+              <TextInput style={[s.input, s.inputFixed]} value="Phakalane" editable={false} />
+
+              <Text style={s.sectionLabel}>Driver Tip</Text>
+              <View style={s.tipRow}>
+                {[0, 5, 10, 20].map(amt => (
+                  <TouchableOpacity key={amt} style={[s.tipBtn, tip === amt && s.tipBtnActive]} onPress={() => setTip(amt)}>
+                    {amt === 0 ? <Ionicons name="remove-circle-outline" size={20} color={tip === 0 ? '#fff' : PINK_DARK} /> : <Text style={[s.tipBtnText, tip === amt && s.tipBtnTextActive]}>P{amt}</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           <Text style={s.sectionLabel}>Payment Summary</Text>
           <View style={s.summaryBox}>

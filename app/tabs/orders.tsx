@@ -21,9 +21,10 @@ function fmtHour(h: any) {
 
 type Order = {
   id: string; orderNumber?: number | null; date: string; orderType: 'pickup' | 'delivery';
+  paymentMethod?: string | null;
   status: string; driverStatus?: string | null;
   items: { name: string; price: number; quantity: number; cakeOrder?: any }[];
-  total: number; cakeRemaining?: number; paid?: boolean;
+  total: number; subtotal?: number; cakeRemaining?: number; paid?: boolean;
   createdAt?: number;
 };
 
@@ -33,6 +34,16 @@ function statusLabel(o: Order): { label: string; color: string; icon: string } {
   if (o.status === 'ready') return { label: 'Ready to Pickup', color: '#22c55e', icon: 'storefront' };
   if (o.status === 'preparing') return { label: 'Preparing', color: '#f59e0b', icon: 'restaurant' };
   return { label: 'Pending', color: '#9a8f8f', icon: 'time' };
+}
+
+function PayTag({ order }: { order: Order }) {
+  const online = order.paymentMethod === 'online' || order.orderType === 'pickup';
+  return (
+    <View style={[s.payTag, online ? s.payTagOnline : s.payTagCod]}>
+      {online && <Ionicons name="checkmark-circle" size={13} color="#fff" />}
+      <Text style={s.payTagTxt}>{online ? 'Paid Online' : 'Pay on Delivery'}</Text>
+    </View>
+  );
 }
 
 function CakeBlock({ cake }: { cake: any }) {
@@ -72,6 +83,7 @@ function OrderRow({ order }: { order: Order }) {
         <Text style={s.orderBarLabel}>Order</Text>
         <Text style={s.orderBarNum}>#{order.orderNumber ? String(order.orderNumber).padStart(3, '0') : '--'}</Text>
       </View>
+      <View style={s.payTagWrap}><PayTag order={order} /></View>
       <View style={s.cardInner}>
         {/* Collapsed header: name + status */}
         <View style={s.cardTop}>
@@ -110,7 +122,7 @@ function OrderRow({ order }: { order: Order }) {
           <View>
             <View style={s.divider} />
             <View style={s.itemRow}>
-              <Text style={s.itemName}>{order.date}</Text>
+              <Text style={s.dateBig}>{order.date}</Text>
               <Text style={s.itemPrice}>{order.orderType === 'delivery' ? 'Delivery' : 'Pickup'}</Text>
             </View>
             <View style={s.divider} />
@@ -199,12 +211,16 @@ const s = StyleSheet.create({
   orderBar:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: PINK_DARK, paddingHorizontal: 16, paddingVertical: 9 },
   orderBarLabel:{ fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 1 },
   orderBarNum:  { fontSize: 22, fontWeight: '900', color: '#fff' },
-  cardInner:    { padding: 16 },
+  payTagWrap:   { alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10 },
+  payTag:       { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  payTagOnline: { backgroundColor: '#22c55e' },
+  payTagCod:    { backgroundColor: '#9a8f8f' },
+  payTagTxt:    { fontSize: 11, fontWeight: '900', color: '#fff', letterSpacing: 0.3 },
+  cardInner:    { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 6 },
   cardTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   cardTopLeft:  { gap: 2, flex: 1, paddingRight: 10 },
   cakeTitle:    { fontSize: 16, fontWeight: '800', color: '#1a1612' },
-  cardDate:     { fontSize: 13, fontWeight: '700', color: '#1a1612' },
-  cardType:     { fontSize: 12, color: '#6b6b6b' },
+  dateBig:      { fontSize: 15, fontWeight: '800', color: '#1a1612', flex: 1 },
   statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
   statusText:   { fontSize: 12, fontWeight: '700' },
   divider:      { height: 1, backgroundColor: PINK_LIGHT, marginVertical: 10 },
